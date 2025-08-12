@@ -232,6 +232,15 @@ input[type="file"][id*="template"] {
   width: 100%;
 }
 
+/* Auto-fill output area - same styling as main status */
+#bm-autofill-output {
+  font-size: small;
+  background-color: rgba(0, 0, 0, 0.2);
+  padding: 0 0.5ch;
+  height: 3.75em;
+  width: 100%;
+}
+
 /* The action buttons below the status textarea */
 #bm-contain-buttons-action {
   display: flex;
@@ -250,7 +259,8 @@ input[type="file"][id*="template"] {
 #bm-contain-coords,
 #bm-contain-buttons-template,
 div:has(> #bm-input-file-template),
-#bm-output-status {
+#bm-output-status,
+#bm-autofill-output {
   margin-top: 0.5em;
 }
 
@@ -275,4 +285,6 @@ div:has(> #bm-input-file-template),
 /* All overlay buttons when disabled */
 #bm-overlay button:disabled {
   text-decoration: line-through;
+  opacity: 0.5;
+  cursor: not-allowed;
 }

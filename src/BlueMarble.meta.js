@@ -11,11 +11,13 @@
 // @updateURL    https://raw.githubusercontent.com/SwingTheVine/Wplace-BlueMarble/main/dist/BlueMarble.user.js
 // @downloadURL  https://raw.githubusercontent.com/SwingTheVine/Wplace-BlueMarble/main/dist/BlueMarble.user.js
 // @run-at       document-start
-// @match        *://*.wplace.live/*
+// @match        https://*.wplace.live/*
+// @connect      *
 // @grant        GM_getResourceText
 // @grant        GM_addStyle
 // @grant        GM.setValue
 // @grant        GM_getValue
+// @grant        GM.cookie
 // @resource     CSS-BM-File https://raw.githubusercontent.com/SwingTheVine/Wplace-BlueMarble/0d5b710473581e449b16a1e77c75ed287286881a/dist/BlueMarble.user.css
 // ==/UserScript==
 
