@@ -766,12 +766,19 @@ function buildOverlayMain() {
           // Wait for the UI to update
           await new Promise(resolve => setTimeout(resolve, 500));
 
-          // Step 2: Get the color palette container
-          const colorPalette = document.evaluate('/html/body/div[1]/div[1]/div[8]/div/div/div[3]/div', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-          if (!colorPalette) {
-            updateAutoFillOutput('❌ Color palette container not found');
-            console.error('Color palette container not found');
-            return [];
+          // Step 2: Wait for the color palette container to appear
+          let colorPalette = document.evaluate('/html/body/div[1]/div[1]/div[8]/div/div/div[3]/div', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+          
+          // Wait until the color palette is available (similar to final button waiting)
+          let waitCount = 1;
+          while (!colorPalette) {
+            console.log(`AUTOFILL: Waiting for color palette to appear... (${waitCount})`);
+            updateAutoFillOutput(`⏳ Waiting for color palette to load... (${waitCount})`);
+            await sleep(200);
+            waitCount++;
+            
+            // Re-query the color palette in case the DOM changed
+            colorPalette = document.evaluate('/html/body/div[1]/div[1]/div[8]/div/div/div[3]/div', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
           }
 
           updateAutoFillOutput('✅ Found color palette container');
