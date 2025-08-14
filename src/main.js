@@ -865,6 +865,9 @@ function buildOverlayMain() {
         // Cache for fetched chunks to avoid multiple requests
         const chunkCache = new Map();
 
+        // Collect ALL pixels that need placement first
+        const allPixelsToPlace = [];
+
         // Process ALL pixels first, regardless of count
         for (const key of sortedChunkKeys) {
           const bitmap = chunkedBitmaps[key];
@@ -954,39 +957,64 @@ function buildOverlayMain() {
                 }
               }
 
-              // Add pixels that need placement to the chunk group
+              // Add pixels that need placement to our collection
               if (needsPlacement && !placedPixels.has(pixelKey)) {
-                const chunkKey = `${chunkX},${chunkY}`;
-                if (!chunkGroups[chunkKey]) {
-                  chunkGroups[chunkKey] = {
-                    chunkCoords: [chunkX, chunkY],
-                    pixels: []
-                  };
-                }
-                chunkGroups[chunkKey].pixels.push([finalLogicalX, finalLogicalY, templateColorId]);
+                allPixelsToPlace.push({
+                  chunkX,
+                  chunkY,
+                  finalLogicalX,
+                  finalLogicalY,
+                  templateColorId,
+                  pixelKey
+                });
               }
             }
           }
         }
 
-        // Convert chunk groups to the desired format and apply count limit
-        const result = [];
-        let totalPixelsAdded = 0;
+        // Sort pixels: black pixels (color ID 1) first, then randomize within each group
+        const blackPixels = allPixelsToPlace.filter(pixel => pixel.templateColorId === 1);
+        const nonBlackPixels = allPixelsToPlace.filter(pixel => pixel.templateColorId !== 1);
 
-        for (const chunkKey in chunkGroups) {
-          const chunkGroup = chunkGroups[chunkKey];
-          const pixelsToAdd = chunkGroup.pixels.slice(0, count - totalPixelsAdded);
-
-          if (pixelsToAdd.length > 0) {
-            result.push([chunkGroup.chunkCoords, pixelsToAdd]);
-            totalPixelsAdded += pixelsToAdd.length;
+        // Shuffle both arrays randomly
+        const shuffleArray = (array) => {
+          const shuffled = [...array];
+          for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
           }
+          return shuffled;
+        };
 
+        const shuffledBlackPixels = shuffleArray(blackPixels);
+        const shuffledNonBlackPixels = shuffleArray(nonBlackPixels);
+
+        // Combine: black pixels first, then other pixels
+        const prioritizedPixels = [...shuffledBlackPixels, ...shuffledNonBlackPixels];
+
+        console.log(`🎲 Randomized pixel order: ${shuffledBlackPixels.length} black pixels first, then ${shuffledNonBlackPixels.length} other pixels`);
+
+        // Group pixels by chunk and apply count limit
+        let totalPixelsAdded = 0;
+        for (const pixel of prioritizedPixels) {
           if (totalPixelsAdded >= count) break;
+
+          const chunkKey = `${pixel.chunkX},${pixel.chunkY}`;
+          if (!chunkGroups[chunkKey]) {
+            chunkGroups[chunkKey] = {
+              chunkCoords: [pixel.chunkX, pixel.chunkY],
+              pixels: []
+            };
+          }
+          chunkGroups[chunkKey].pixels.push([pixel.finalLogicalX, pixel.finalLogicalY, pixel.templateColorId]);
+          totalPixelsAdded++;
         }
 
-        const totalPixelsFound = Object.values(chunkGroups).reduce((sum, group) => sum + group.pixels.length, 0);
-        console.log(`\n📊 SUMMARY: Found ${totalPixelsFound} total pixels that need placement (filtered by ${ownedColors.length} owned colors), returning ${totalPixelsAdded} pixels`);
+        // Convert chunk groups to the desired format
+        const result = Object.values(chunkGroups).map(group => [group.chunkCoords, group.pixels]);
+
+        const totalPixelsFound = allPixelsToPlace.length;
+        console.log(`\n📊 SUMMARY: Found ${totalPixelsFound} total pixels that need placement (filtered by ${ownedColors.length} owned colors), returning ${totalPixelsAdded} pixels (${shuffledBlackPixels.length} black priority)`);
 
         return result;
       };
