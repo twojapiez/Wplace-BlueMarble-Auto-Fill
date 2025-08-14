@@ -7,7 +7,7 @@
     <td>&emsp;<a href="#overview">Overview</a></td>
   </tr>
   <tr>
-    <td>&emsp;<a href="#Fork Info">Fork Info</a></td>
+    <td>&emsp;<a href="#fork-info">Fork Info</a></td>
   </tr>
   <tr>
     <td>&emsp;&emsp;<a href="#installation-instructions">Installation Instructions</a></td>
