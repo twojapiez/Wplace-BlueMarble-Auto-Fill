@@ -1156,8 +1156,8 @@ function buildOverlayMain() {
                 instance.handleDisplayStatus(`Waiting for charges... (${charges.count.toFixed(3)}/${charges.max}). Time remaining: ${remainingSeconds}s`);
                 updateAutoFillOutput(`⏳ Charging... ${remainingSeconds}s remaining`);
 
-                // Sleep for 5 seconds or until the end time, whichever is shorter
-                await sleep(Math.min(5000, remaining));
+                // Sleep for 1 second or until the end time, whichever is shorter
+                await sleep(Math.min(1000, remaining));
               }
 
               if (!isRunning) {
@@ -1258,7 +1258,7 @@ function buildOverlayMain() {
             console.log("AUTOFILL: Closing...")
             // Resetting our position by closing paint menu
             const parentDiv = document.querySelector('.relative.px-3');
-            const closeButton = parentDiv ? parentDiv.querySelector('.btn.btn-circle.btn-sm') : null;
+            const closeButton = parentDiv ? parentDiv.querySelector('.btn.btn-circle.btn-sm svg path[d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"]')?.closest('button') : null;
             if (closeButton) {
               closeButton.click();
             }
