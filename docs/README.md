@@ -43,17 +43,17 @@
 
 <h1>Blue Marble</h1>
 <a href="" target="_blank" rel="noopener noreferrer"><img alt="Latest Version" src="https://img.shields.io/badge/Latest_Version-0.78.0-lightblue?style=flat"></a>
-<a href="https://github.com/SwingTheVine/Wplace-BlueMarble/releases" target="_blank" rel="noopener noreferrer"><img alt="Latest Release" src="https://img.shields.io/github/v/release/SwingTheVine/Wplace-BlueMarble?sort=semver&style=flat&label=Latest%20Release&color=blue"></a>
-<a href="https://github.com/SwingTheVine/Wplace-BlueMarble/blob/main/LICENSE.txt" target="_blank" rel="noopener noreferrer"><img alt="Software License: MPL-2.0" src="https://img.shields.io/badge/Software_License-MPL--2.0-slateblue?style=flat"></a>
+<a href="https://github.com/KeksTM/Wplace-BlueMarble-Auto-Fill/releases" target="_blank" rel="noopener noreferrer"><img alt="Latest Release" src="https://img.shields.io/github/v/release/KeksTM/Wplace-BlueMarble-Auto-Fill?sort=semver&style=flat&label=Latest%20Release&color=blue"></a>
+<a href="https://github.com/KeksTM/Wplace-BlueMarble-Auto-Fill/blob/main/LICENSE.txt" target="_blank" rel="noopener noreferrer"><img alt="Software License: MPL-2.0" src="https://img.shields.io/badge/Software_License-MPL--2.0-slateblue?style=flat"></a>
 <a href="https://discord.gg/tpeBPy46hf" target="_blank" rel="noopener noreferrer"><img alt="Contact Me" src="https://img.shields.io/badge/Contact_Me-gray?style=flat&logo=Discord&logoColor=white&logoSize=auto&labelColor=cornflowerblue"></a>
 <a href="" target="_blank" rel="noopener noreferrer"><img alt="WakaTime" src="https://img.shields.io/badge/Coding_Time-91hrs_0mins-blue?style=flat&logo=wakatime&logoColor=black&logoSize=auto&labelColor=white"></a>
 <a href="" target="_blank" rel="noopener noreferrer"><img alt="Total Patches" src="https://img.shields.io/badge/Total_Patches-494-black?style=flat"></a>
-<a href="" target="_blank" rel="noopener noreferrer"><img alt="Total Lines of Code" src="https://tokei.rs/b1/github/SwingTheVine/Wplace-BlueMarble?category=code"></a>
-<a href="" target="_blank" rel="noopener noreferrer"><img alt="Total Comments" src="https://tokei.rs/b1/github/SwingTheVine/Wplace-BlueMarble?category=comments"></a>
+<a href="" target="_blank" rel="noopener noreferrer"><img alt="Total Lines of Code" src="https://tokei.rs/b1/github/KeksTM/Wplace-BlueMarble-Auto-Fill?category=code"></a>
+<a href="" target="_blank" rel="noopener noreferrer"><img alt="Total Comments" src="https://tokei.rs/b1/github/KeksTM/Wplace-BlueMarble-Auto-Fill?category=comments"></a>
 <a href="" target="_blank" rel="noopener noreferrer"><img alt="Compression" src="https://img.shields.io/badge/Compression-73.86%25-blue"></a>
 <a href="" target="_blank" rel="noopener noreferrer"><img alt="Visitors" src="https://img.shields.io/badge/Visitors-37_847-gainsboro?style=flat"></a>
-<a href="" target="_blank" rel="noopener noreferrer"><img alt="Build" src="https://github.com/SwingTheVine/Wplace-BlueMarble/actions/workflows/build.yml/badge.svg"></a>
-<a href="" target="_blank" rel="noopener noreferrer"><img alt="CodeQL" src="https://github.com/SwingTheVine/Wplace-BlueMarble/actions/workflows/github-code-scanning/codeql/badge.svg"></a>
+<a href="" target="_blank" rel="noopener noreferrer"><img alt="Build" src="https://github.com/KeksTM/Wplace-BlueMarble-Auto-Fill/actions/workflows/build.yml/badge.svg"></a>
+<a href="" target="_blank" rel="noopener noreferrer"><img alt="CodeQL" src="https://github.com/KeksTM/Wplace-BlueMarble-Auto-Fill/actions/workflows/github-code-scanning/codeql/badge.svg"></a>
 
 <h2>Fork Info</h2>
 <p>
@@ -64,7 +64,7 @@
   This was coded in a few days, is implemented very lazily and barely works so dont expect too much of it.
 <h2>Overview</h2>
 <p>
-  Welcome to Blue Marble! Blue Marble is a userscript for the website <a href="https://wplace.live/" target="_blank" rel="noopener noreferrer">wplace.live</a>. If you like this userscript, please ⭐ the repository! If you wish to contribute to Blue Marble, check out the <a href="https://github.com/SwingTheVine/Wplace-BlueMarble/blob/main/docs/CONTRIBUTING.md" target="_blank" rel="noopener noreferrer">CONTRIBUTING.md</a> file in <code>docs/</code>.
+  Welcome to Blue Marble! Blue Marble is a userscript for the website <a href="https://wplace.live/" target="_blank" rel="noopener noreferrer">wplace.live</a>. If you like this userscript, please ⭐ the repository! If you wish to contribute to Blue Marble, check out the <a href="https://github.com/KeksTM/Wplace-BlueMarble-Auto-Fill/blob/main/docs/CONTRIBUTING.md" target="_blank" rel="noopener noreferrer">CONTRIBUTING.md</a> file in <code>docs/</code>.
 
   <h3>Installation Instructions</h3>
   <a href="" target="_blank" rel="noopener noreferrer"><img alt="Supported Browsers" src="https://img.shields.io/badge/Supported%20Browsers-Chrome%20%7C%20Firefox%2A%20%7C%20Safari%20%7C%20Edge%20%7C%20Brave-orange?style=flat"></a>
@@ -81,28 +81,28 @@
       <ol>
         <li>Install the <a href="https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo" target="_blank" rel="noopener noreferrer">TamperMonkey</a> plugin for Chrome.
         <br>
-        <img alt="Click the 'Add extention' button" src="https://github.com/SwingTheVine/Wplace-BlueMarble/blob/main/docs/assets/ComputerChromeInstall1.png"></li>
+        <img alt="Click the 'Add extention' button" src="https://github.com/KeksTM/Wplace-BlueMarble-Auto-Fill/blob/main/docs/assets/ComputerChromeInstall1.png"></li>
         <li>Right-click the extention.
         <br>
-        <img alt="Enter the 'Manage Extention' menu" src="https://github.com/SwingTheVine/Wplace-BlueMarble/blob/main/docs/assets/ComputerChromeInstall2.png"></li>
+        <img alt="Enter the 'Manage Extention' menu" src="https://github.com/KeksTM/Wplace-BlueMarble-Auto-Fill/blob/main/docs/assets/ComputerChromeInstall2.png"></li>
         <li>Left-click "Manage Extension."</li>
         <li>Enable "Developer Mode."
         <br>
-        <img alt="Enable 'Developer Mode' and 'Allow user scripts'" src="https://github.com/SwingTheVine/Wplace-BlueMarble/blob/main/docs/assets/ComputerChromeInstall3.png"></li>
+        <img alt="Enable 'Developer Mode' and 'Allow user scripts'" src="https://github.com/KeksTM/Wplace-BlueMarble-Auto-Fill/blob/main/docs/assets/ComputerChromeInstall3.png"></li>
         <li>Enable "Allow user scripts."</li>
-        <li>Download the <a href="https://github.com/SwingTheVine/Wplace-BlueMarble/releases" target="_blank" rel="noopener noreferrer">BlueMarble.user.js</a> file in the "assets" of the latest release.</li>
+        <li>Download the <a href="https://github.com/KeksTM/Wplace-BlueMarble-Auto-Fill/releases" target="_blank" rel="noopener noreferrer">BlueMarble.user.js</a> file in the "assets" of the latest release.</li>
         <li>Open the TamperMonkey Dashboard.
         <br>
-        <img alt="Enter the TamperMonkey 'Dashboard'" src="https://github.com/SwingTheVine/Wplace-BlueMarble/blob/main/docs/assets/ComputerChromeInstall4.png"></li>
+        <img alt="Enter the TamperMonkey 'Dashboard'" src="https://github.com/KeksTM/Wplace-BlueMarble-Auto-Fill/blob/main/docs/assets/ComputerChromeInstall4.png"></li>
         <li>Drag the <code>BlueMarble.user.js</code> file inside the dashboard of TamperMonkey.
         <br>
-        <img alt="Drag the userscript into the dashboard" src="https://github.com/SwingTheVine/Wplace-BlueMarble/blob/main/docs/assets/ComputerChromeInstall5.png"></li>
+        <img alt="Drag the userscript into the dashboard" src="https://github.com/KeksTM/Wplace-BlueMarble-Auto-Fill/blob/main/docs/assets/ComputerChromeInstall5.png"></li>
         <li>Click the "Install" button to install Blue Marble.
         <br>
-        <img alt="Click the 'Install' button" src="https://github.com/SwingTheVine/Wplace-BlueMarble/blob/main/docs/assets/ComputerChromeInstall6.png"></li>
+        <img alt="Click the 'Install' button" src="https://github.com/KeksTM/Wplace-BlueMarble-Auto-Fill/blob/main/docs/assets/ComputerChromeInstall6.png"></li>
         <li>Enable Blue Marble inside the TamperMonkey dashboard.
         <br>
-        <img alt="Enable Blue Marble" src="https://github.com/SwingTheVine/Wplace-BlueMarble/blob/main/docs/assets/ComputerChromeInstall7.png"></li>
+        <img alt="Enable Blue Marble" src="https://github.com/KeksTM/Wplace-BlueMarble-Auto-Fill/blob/main/docs/assets/ComputerChromeInstall7.png"></li>
         <li>Refresh the <a href="https://wplace.live/" target="_blank" rel="noopener noreferrer">wplace.live</a> webpage.</li>
       </ol>
     </details>
@@ -113,27 +113,27 @@
       <ol>
         <li>Install the <a href="https://microsoftedge.microsoft.com/addons/detail/iikmkjmpaadaobahmlepeloendndfphd" target="_blank" rel="noopener noreferrer">TamperMonkey</a> plugin for Microsoft Edge.
         <br>
-        <img alt="Click the 'Get' button" src="https://github.com/SwingTheVine/Wplace-BlueMarble/blob/main/docs/assets/ComputerEdgeInstall1.png"></li>
+        <img alt="Click the 'Get' button" src="https://github.com/KeksTM/Wplace-BlueMarble-Auto-Fill/blob/main/docs/assets/ComputerEdgeInstall1.png"></li>
         <li>Right-click the extention.
         <br>
-        <img alt="Enter the 'Manage Extention' menu" src="https://github.com/SwingTheVine/Wplace-BlueMarble/blob/main/docs/assets/ComputerEdgeInstall2.png"></li>
+        <img alt="Enter the 'Manage Extention' menu" src="https://github.com/KeksTM/Wplace-BlueMarble-Auto-Fill/blob/main/docs/assets/ComputerEdgeInstall2.png"></li>
         <li>Left-click "Manage Extension."</li>
         <li>Enable "Developer Mode."
         <br>
-        <img alt="Enable 'Developer Mode'" src="https://github.com/SwingTheVine/Wplace-BlueMarble/blob/main/docs/assets/ComputerEdgeInstall3.png"></li>
-        <li>Download the <a href="https://github.com/SwingTheVine/Wplace-BlueMarble/releases" target="_blank" rel="noopener noreferrer">BlueMarble.user.js</a> file in the "assets" of the latest release.</li>
+        <img alt="Enable 'Developer Mode'" src="https://github.com/KeksTM/Wplace-BlueMarble-Auto-Fill/blob/main/docs/assets/ComputerEdgeInstall3.png"></li>
+        <li>Download the <a href="https://github.com/KeksTM/Wplace-BlueMarble-Auto-Fill/releases" target="_blank" rel="noopener noreferrer">BlueMarble.user.js</a> file in the "assets" of the latest release.</li>
         <li>Open the TamperMonkey Dashboard.
         <br>
-        <img alt="Enter the TamperMonkey 'Dashboard'" src="https://github.com/SwingTheVine/Wplace-BlueMarble/blob/main/docs/assets/ComputerEdgeInstall4.png"></li>
+        <img alt="Enter the TamperMonkey 'Dashboard'" src="https://github.com/KeksTM/Wplace-BlueMarble-Auto-Fill/blob/main/docs/assets/ComputerEdgeInstall4.png"></li>
         <li>Drag the <code>BlueMarble.user.js</code> file inside the dashboard of TamperMonkey.
         <br>
-        <img alt="Drag the userscript into the dashboard" src="https://github.com/SwingTheVine/Wplace-BlueMarble/blob/main/docs/assets/ComputerEdgeInstall5.png"></li>
+        <img alt="Drag the userscript into the dashboard" src="https://github.com/KeksTM/Wplace-BlueMarble-Auto-Fill/blob/main/docs/assets/ComputerEdgeInstall5.png"></li>
         <li>Click the "Install" button to install Blue Marble.
         <br>
-        <img alt="Click the 'Install' button" src="https://github.com/SwingTheVine/Wplace-BlueMarble/blob/main/docs/assets/ComputerChromeInstall6.png"></li>
+        <img alt="Click the 'Install' button" src="https://github.com/KeksTM/Wplace-BlueMarble-Auto-Fill/blob/main/docs/assets/ComputerChromeInstall6.png"></li>
         <li>Enable Blue Marble inside the TamperMonkey dashboard.
         <br>
-        <img alt="Enable Blue Marble" src="https://github.com/SwingTheVine/Wplace-BlueMarble/blob/main/docs/assets/ComputerChromeInstall7.png"></li>
+        <img alt="Enable Blue Marble" src="https://github.com/KeksTM/Wplace-BlueMarble-Auto-Fill/blob/main/docs/assets/ComputerChromeInstall7.png"></li>
         <li>Refresh the <a href="https://wplace.live/" target="_blank" rel="noopener noreferrer">wplace.live</a> webpage.</li>
       </ol>
     </details>
@@ -144,20 +144,20 @@
       <ol>
         <li>Install the <a href="https://addons.mozilla.org/en-US/firefox/addon/tampermonkey/" target="_blank" rel="noopener noreferrer">TamperMonkey</a> plugin for Firefox.
         <br>
-        <img alt="Click the 'Add to Firefox' button" src="https://github.com/SwingTheVine/Wplace-BlueMarble/blob/main/docs/assets/ComputerFirefoxInstall1.png"></li>
-        <li>Download the <a href="https://github.com/SwingTheVine/Wplace-BlueMarble/releases" target="_blank" rel="noopener noreferrer">BlueMarble.user.js</a> file in the "assets" of the latest release.</li>
+        <img alt="Click the 'Add to Firefox' button" src="https://github.com/KeksTM/Wplace-BlueMarble-Auto-Fill/blob/main/docs/assets/ComputerFirefoxInstall1.png"></li>
+        <li>Download the <a href="https://github.com/KeksTM/Wplace-BlueMarble-Auto-Fill/releases" target="_blank" rel="noopener noreferrer">BlueMarble.user.js</a> file in the "assets" of the latest release.</li>
         <li>Open the TamperMonkey Dashboard.
         <br>
-        <img alt="Enter the TamperMonkey 'Dashboard'" src="https://github.com/SwingTheVine/Wplace-BlueMarble/blob/main/docs/assets/ComputerFirefoxInstall2.png"></li>
+        <img alt="Enter the TamperMonkey 'Dashboard'" src="https://github.com/KeksTM/Wplace-BlueMarble-Auto-Fill/blob/main/docs/assets/ComputerFirefoxInstall2.png"></li>
         <li>Drag the <code>BlueMarble.user.js</code> file inside the dashboard of TamperMonkey.
         <br>
-        <img alt="Drag the userscript into the dashboard" src="https://github.com/SwingTheVine/Wplace-BlueMarble/blob/main/docs/assets/ComputerFirefoxInstall3.png"></li>
+        <img alt="Drag the userscript into the dashboard" src="https://github.com/KeksTM/Wplace-BlueMarble-Auto-Fill/blob/main/docs/assets/ComputerFirefoxInstall3.png"></li>
         <li>Click the "Install" button to install Blue Marble.
         <br>
-        <img alt="Click the 'Install' button" src="https://github.com/SwingTheVine/Wplace-BlueMarble/blob/main/docs/assets/ComputerChromeInstall6.png"></li>
+        <img alt="Click the 'Install' button" src="https://github.com/KeksTM/Wplace-BlueMarble-Auto-Fill/blob/main/docs/assets/ComputerChromeInstall6.png"></li>
         <li>Enable Blue Marble inside the TamperMonkey dashboard.
         <br>
-        <img alt="Enable Blue Marble" src="https://github.com/SwingTheVine/Wplace-BlueMarble/blob/main/docs/assets/ComputerChromeInstall7.png"></li>
+        <img alt="Enable Blue Marble" src="https://github.com/KeksTM/Wplace-BlueMarble-Auto-Fill/blob/main/docs/assets/ComputerChromeInstall7.png"></li>
         <li>Refresh the <a href="https://wplace.live/" target="_blank" rel="noopener noreferrer">wplace.live</a> webpage.</li>
       </ol>
     </details>
@@ -169,7 +169,7 @@
     <ol>
       <li>Find the pixel of the top left corner. Fill in <code>Tl X</code>, <code>Tl Y</code>, <code>Px X</code>, and <code>Px Y</code> with the coordinates. You can use the "Pin" icon to auto-fill the coordinates after clicking the pixel.
       <br>
-      <img alt="Find template coordinates" src="https://github.com/SwingTheVine/Wplace-BlueMarble/blob/main/docs/assets/TemplateCoordinates1.png"></li>
+      <img alt="Find template coordinates" src="https://github.com/KeksTM/Wplace-BlueMarble-Auto-Fill/blob/main/docs/assets/TemplateCoordinates1.png"></li>
       <li>Upload a PNG or WEBP image.</li>
       <li>Click the "Enable" button.</li>
     </ol>
@@ -204,7 +204,7 @@
       <p>
         The coordinate system for wplace.live is unique. Instead of all pixels having a global coordinate number (x, y), the coordinate number is relative to the tile. This means you need to know the tile number and the coordinate number to do anything. In Blue Marble, the tile coordinates and the pixel coordinates are displayed when you click on a pixel. These are the coordinates you should use for aligning a template.
         <br>
-        <img alt="Where to find tile coordinates" src="https://github.com/SwingTheVine/Wplace-BlueMarble/blob/main/docs/assets/TemplateCoordinatesDisplay.png">
+        <img alt="Where to find tile coordinates" src="https://github.com/KeksTM/Wplace-BlueMarble-Auto-Fill/blob/main/docs/assets/TemplateCoordinatesDisplay.png">
       </p>
       <h5>Template Coordinates</h5>
       <p>
