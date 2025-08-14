@@ -7,6 +7,9 @@
     <td>&emsp;<a href="#overview">Overview</a></td>
   </tr>
   <tr>
+    <td>&emsp;<a href="#Fork Info">Overview</a></td>
+  </tr>
+  <tr>
     <td>&emsp;&emsp;<a href="#installation-instructions">Installation Instructions</a></td>
   </tr>
   <tr>
@@ -52,6 +55,12 @@
 <a href="" target="_blank" rel="noopener noreferrer"><img alt="Build" src="https://github.com/SwingTheVine/Wplace-BlueMarble/actions/workflows/build.yml/badge.svg"></a>
 <a href="" target="_blank" rel="noopener noreferrer"><img alt="CodeQL" src="https://github.com/SwingTheVine/Wplace-BlueMarble/actions/workflows/github-code-scanning/codeql/badge.svg"></a>
 
+<h2>Fork Info</h2>
+<p>
+  Lazy, Vibecoded fork of BlueMarbel, add a blueprint and hit the autofill button to start autoplacing pixels.
+  This will open your Profile and hit save to force a Update of our userdata (to get curent paint charges), if your paint charges are full it will open your paint menu, read the colors you own, and place them randomly starting with black (for outlines n stuff). It places them by clicking the centre of the canvas, hitting the finish button in the paint menu and intercepting the request to add the pixels we want to paint. Then it clicks it again and closes the paint menu to update our ui and shit.
+
+  This was coded in a few days, is implemented very lazily and barely works so dont expect too much of it.
 <h2>Overview</h2>
 <p>
   Welcome to Blue Marble! Blue Marble is a userscript for the website <a href="https://wplace.live/" target="_blank" rel="noopener noreferrer">wplace.live</a>. If you like this userscript, please ⭐ the repository! If you wish to contribute to Blue Marble, check out the <a href="https://github.com/SwingTheVine/Wplace-BlueMarble/blob/main/docs/CONTRIBUTING.md" target="_blank" rel="noopener noreferrer">CONTRIBUTING.md</a> file in <code>docs/</code>.
