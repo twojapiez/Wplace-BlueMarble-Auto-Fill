@@ -3,11 +3,11 @@
     <td><a href="#blue-marble">Blue Marble</a></td>
     <td valign="top" rowspan="99"><a href="https://discord.gg/tpeBPy46hf"><img alt="Discord Banner" src="https://discord.com/api/guilds/796124137042608188/widget.png?style=banner4"></a></td>
   </tr>
-  <tr>
-    <td>&emsp;<a href="#overview">Overview</a></td>
+    <tr>
+    <td>&emsp;<a href="#fork-info">Fork Info</a></td>
   </tr>
   <tr>
-    <td>&emsp;<a href="#fork-info">Fork Info</a></td>
+    <td>&emsp;<a href="#overview">Overview</a></td>
   </tr>
   <tr>
     <td>&emsp;&emsp;<a href="#installation-instructions">Installation Instructions</a></td>
