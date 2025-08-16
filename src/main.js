@@ -1200,10 +1200,31 @@ function buildOverlayMain() {
               // Wait with progress updates every 5 seconds
               const startTime = Date.now();
               const endTime = startTime + totalWaitTime;
+              const halfWayTime = startTime + (totalWaitTime / 2);
+              let hasUpdatedAt50Percent = false;
 
               while (Date.now() < endTime && isRunning) {
                 const remaining = Math.max(0, endTime - Date.now());
                 const remainingSeconds = (remaining / 1000).toFixed(1);
+
+                // Force user data update at 50% of waiting time
+                if (!hasUpdatedAt50Percent && Date.now() >= halfWayTime) {
+                  hasUpdatedAt50Percent = true;
+                  console.log("AUTOFILL: Reached 50% of wait time, forcing user data update");
+                  updateAutoFillOutput("🔄 50% wait complete - checking charges via forced update");
+                  await forceUpdateUserData();
+                  
+                  // Check if we now have enough charges after the update
+                  const updatedCharges = instance.charges;
+                  if (updatedCharges && updatedCharges.count >= updatedCharges.max) {
+                    console.log("AUTOFILL: Charges are now full after 50% update, breaking wait loop");
+                    updateAutoFillOutput("✅ Charges full after 50% update - proceeding immediately!");
+                    break;
+                  } else {
+                    console.log(`AUTOFILL: After 50% update - charges: ${updatedCharges?.count.toFixed(3)}/${updatedCharges?.max}, continuing wait`);
+                    updateAutoFillOutput(`📊 50% update result: ${updatedCharges?.count.toFixed(3)}/${updatedCharges?.max} charges, continuing wait`);
+                  }
+                }
 
                 instance.handleDisplayStatus(`Waiting for charges... (${charges.count.toFixed(3)}/${charges.max}). Time remaining: ${remainingSeconds}s`);
                 updateAutoFillOutput(`⏳ Charging... ${remainingSeconds}s remaining`);
