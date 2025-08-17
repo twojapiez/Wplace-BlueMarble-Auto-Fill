@@ -550,11 +550,7 @@ function buildOverlayMain() {
         if (textarea) {
           const timestamp = new Date().toLocaleTimeString();
           const newContent = `[${timestamp}] ${message}`;
-          if (textarea.value) {
-            textarea.value = newContent + '\n' + textarea.value;
-          } else {
-            textarea.value = newContent;
-          }
+          textarea.value = newContent + '\n';
           // Limit to last 20 lines to prevent excessive memory usage
           const lines = textarea.value.split('\n');
           if (lines.length > 20) {
