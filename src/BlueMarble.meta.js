@@ -7,7 +7,7 @@
 // @license      MPL-2.0
 // @supportURL   https://discord.gg/tpeBPy46hf
 // @homepageURL  https://github.com/KeksTM/Wplace-BlueMarble-Auto-Fill
-// @icon         https://raw.githubusercontent.com/KeksTM/Wplace-BlueMarble-Auto-Fill/0d5b710473581e449b16a1e77c75ed287286881a/dist/assets/Favicon.png
+// @icon         https://raw.githubusercontent.com/KeksTM/Wplace-BlueMarble-Auto-Fill/refs/heads/main/dist/assets/Favicon.png
 // @updateURL    https://raw.githubusercontent.com/KeksTM/Wplace-BlueMarble-Auto-Fill/main/dist/BlueMarble.user.js
 // @downloadURL  https://raw.githubusercontent.com/KeksTM/Wplace-BlueMarble-Auto-Fill/main/dist/BlueMarble.user.js
 // @run-at       document-start
@@ -17,7 +17,7 @@
 // @grant        GM_addStyle
 // @grant        GM.setValue
 // @grant        GM_getValue
-// @resource     CSS-BM-File https://raw.githubusercontent.com/KeksTM/Wplace-BlueMarble-Auto-Fill/0d5b710473581e449b16a1e77c75ed287286881a/dist/BlueMarble.user.css
+// @resource     CSS-BM-File https://raw.githubusercontent.com/KeksTM/Wplace-BlueMarble-Auto-Fill/refs/heads/main/dist/BlueMarble.user.css
 // ==/UserScript==
 
 // Wplace  --> https://wplace.live

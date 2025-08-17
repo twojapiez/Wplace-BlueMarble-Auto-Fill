@@ -1153,18 +1153,24 @@ function buildOverlayMain() {
 
 
       button.onclick = async () => {
+        // Helper function to format seconds as hh:mm:ss
+        const formatTime = (seconds) => {
+          const hours = Math.floor(seconds / 3600);
+          const minutes = Math.floor((seconds % 3600) / 60);
+          const secs = Math.floor(seconds % 60);
+          return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        };
+
         if (isRunning) {
           console.log("AUTOFILL: User requested stop");
           isRunning = false;
           button.textContent = 'Auto Fill';
-          instance.handleDisplayStatus('Auto fill stopped.');
           updateAutoFillOutput('⏹️ Auto-fill stopped by user');
           return;
         }
 
         if (!instance.apiManager?.templateManager?.templatesArray.length || !instance.apiManager?.templateManager?.templatesShouldBeDrawn) {
           console.log("AUTOFILL: No active template available");
-          instance.handleDisplayStatus('No active template to auto fill!');
           updateAutoFillOutput('❌ No active template available');
           return;
         }
@@ -1172,7 +1178,6 @@ function buildOverlayMain() {
         console.log("AUTOFILL: Starting auto fill process");
         isRunning = true;
         button.textContent = 'Stop Fill';
-        instance.handleDisplayStatus('Starting auto fill...');
         updateAutoFillOutput('🚀 Auto-fill started!');
 
         while (isRunning) {
@@ -1181,7 +1186,7 @@ function buildOverlayMain() {
             const charges = instance.apiManager?.charges;
             if (!charges) {
               console.log("AUTOFILL: No charge data available, waiting...");
-              instance.handleDisplayStatus('Waiting for charge data...');
+              updateAutoFillOutput('⏳ Waiting for charge data...');
               await sleep(5000);
               continue;
             }
@@ -1213,8 +1218,7 @@ function buildOverlayMain() {
               const totalWaitTime = timeToNextCharge + ((chargesNeeded - 1) * cooldownMs);
 
               console.log(`AUTOFILL: Waiting ${(totalWaitTime/1000).toFixed(1)}s for ${chargesNeeded} charges`);
-              updateAutoFillOutput(`⏱️ Precise timing: ${charges.count.toFixed(3)}/${charges.max} charges, waiting ${(totalWaitTime / 1000).toFixed(1)}s`);
-              instance.handleDisplayStatus(`Waiting for charges... (${charges.count.toFixed(3)}/${charges.max}). Precise wait: ${(totalWaitTime / 1000).toFixed(1)}s`);
+              updateAutoFillOutput(`⏱️ Precise timing: ${charges.count.toFixed(3)}/${charges.max} charges, waiting ${formatTime(totalWaitTime / 1000)}`);
 
               // Wait with progress updates every 5 seconds
               const startTime = Date.now();
@@ -1224,7 +1228,6 @@ function buildOverlayMain() {
 
               while (Date.now() < endTime && isRunning) {
                 const remaining = Math.max(0, endTime - Date.now());
-                const remainingSeconds = (remaining / 1000).toFixed(1);
 
                 // Force user data update at 50% of waiting time
                 if (!hasUpdatedAt50Percent && Date.now() >= halfWayTime) {
@@ -1245,8 +1248,8 @@ function buildOverlayMain() {
                   }
                 }
 
-                instance.handleDisplayStatus(`Waiting for charges... (${charges.count.toFixed(3)}/${charges.max}). Time remaining: ${remainingSeconds}s`);
-                updateAutoFillOutput(`⏳ Charging... ${remainingSeconds}s remaining`);
+                const remainingTime = formatTime(remaining / 1000);
+                updateAutoFillOutput(`⏳ Charging... ${remainingTime} remaining`);
 
                 // Sleep for 1 second or until the end time, whichever is shorter
                 await sleep(Math.min(1000, remaining));
@@ -1263,19 +1266,19 @@ function buildOverlayMain() {
             console.log("AUTOFILL: Charges are full, proceeding with pixel placement");
             // Get owned colors before finding pixels
             console.log("AUTOFILL: Checking owned colors...");
-            instance.handleDisplayStatus('Checking owned colors...');
+            updateAutoFillOutput('🔍 Checking owned colors...');
             const ownedColors = await getOwnedColors();
             console.log(`AUTOFILL: Found ${ownedColors.length} owned colors`);
             if (ownedColors.length === 0) {
               console.log("AUTOFILL: No owned colors found, retrying in 10s");
-              instance.handleDisplayError('No owned colors found! Retrying in 10s...');
+              updateAutoFillOutput('❌ No owned colors found! Retrying in 10s...');
               await sleep(10000);
               continue;
             }
 
             const pixelsToPlaceCount = charges.count;
             console.log(`AUTOFILL: Looking for up to ${pixelsToPlaceCount} pixels to place`);
-            instance.handleDisplayStatus(`Charges available (${charges.count}/${charges.max}). Finding up to ${pixelsToPlaceCount} pixels from ${ownedColors.length} owned colors...`);
+            updateAutoFillOutput(`⚡ Charges available (${charges.count}/${charges.max}). Finding up to ${pixelsToPlaceCount} pixels from ${ownedColors.length} owned colors...`);
             const chunkGroups = await getNextPixels(pixelsToPlaceCount, ownedColors);
 
             console.log(`AUTOFILL: Found ${chunkGroups.length} chunk groups to process`);
@@ -1283,7 +1286,6 @@ function buildOverlayMain() {
               console.log("AUTOFILL: Template completed - no more pixels to place");
               isRunning = false;
               button.textContent = 'Auto Fill';
-              instance.handleDisplayStatus('Template completed! All pixels with owned colors have been placed.');
               updateAutoFillOutput('🎉 Template completed! All owned color pixels placed.');
               break;
             }
@@ -1291,7 +1293,6 @@ function buildOverlayMain() {
             // Calculate total pixels to place
             const totalPixels = chunkGroups.reduce((sum, group) => sum + group[1].length, 0);
             console.log(`AUTOFILL: Will place ${totalPixels} pixels across ${chunkGroups.length} chunks`);
-            instance.handleDisplayStatus(`Placing ${totalPixels} pixels in ${chunkGroups.length} chunk(s)...`);
             updateAutoFillOutput(`🎯 Found ${totalPixels} pixels to place in ${chunkGroups.length} chunks`);
 
             for (const chunkGroup of chunkGroups) {
@@ -1304,11 +1305,10 @@ function buildOverlayMain() {
               const [chunkX, chunkY] = chunkCoords;
 
               console.log(`AUTOFILL: Processing chunk ${chunkX},${chunkY} with ${pixels.length} pixels`);
-              instance.handleDisplayStatus(`Placing ${pixels.length} pixels in chunk ${chunkX},${chunkY}...`);
+              updateAutoFillOutput(`🔄 Placing ${pixels.length} pixels in chunk ${chunkX},${chunkY}...`);
               await placePixelsWithInterceptor(chunkCoords, pixels);
               console.log("AUTOFILL: Finished Intercept")
               pixels.forEach(([logicalX, logicalY]) => placedPixels.add(`${chunkX},${chunkY},${logicalX},${logicalY}`));
-              instance.handleDisplayStatus(`Placed ${pixels.length} pixels in chunk ${chunkX},${chunkY}.`);
               updateAutoFillOutput(`✅ Placed ${pixels.length} pixels in chunk (${chunkX},${chunkY})`);
               await sleep(500); // Small delay between chunk requests
             }
@@ -1357,7 +1357,6 @@ function buildOverlayMain() {
 
             if (isRunning) {
               console.log(`AUTOFILL: Batch completed successfully - ${totalPixels} pixels placed`);
-              instance.handleDisplayStatus(`Finished placing batch of ${totalPixels} pixels.`);
               updateAutoFillOutput(`🎯 Batch complete: ${totalPixels} pixels placed`);
             }
 
@@ -1367,7 +1366,6 @@ function buildOverlayMain() {
 
           } catch (error) {
             console.error('AUTOFILL: Error during auto fill cycle:', error);
-            instance.handleDisplayError(`Error: ${error.message}. Retrying in 10s.`);
             updateAutoFillOutput(`❌ Error: ${error.message}. Retrying in 10s...`);
             await sleep(10000);
           }
