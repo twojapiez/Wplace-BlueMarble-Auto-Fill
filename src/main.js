@@ -781,6 +781,19 @@ function buildOverlayMain() {
           // Wait for the UI to update
           await new Promise(resolve => setTimeout(resolve, 500));
 
+          // Step 1.5: Check for expand button and click it if needed
+          const expandButton = document.querySelector('.btn.btn-lg.btn-square.sm\\:btn-xl.absolute.bottom-0.left-0.shadow-md');
+          if (expandButton) {
+            // Check if it contains the exact SVG path we're looking for
+            const svg = expandButton.querySelector('svg path[d="M480-120 300-300l58-58 122 122 122-122 58 58-180 180ZM358-598l-58-58 180-180 180 180-58 58-122-122-122 122Z"]');
+            if (svg) {
+              console.log('Found color palette expand button, clicking to expand');
+              updateAutoFillOutput('🔽 Expanding color palette...');
+              expandButton.click();
+              await new Promise(resolve => setTimeout(resolve, 500)); // Wait for expansion
+            }
+          }
+
           // Step 2: Wait for the color palette container to appear
           let colorPalette = document.evaluate('/html/body/div[1]/div[1]/div[8]/div/div/div[3]/div', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
           
