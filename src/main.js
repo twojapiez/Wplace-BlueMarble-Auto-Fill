@@ -597,12 +597,31 @@ function buildOverlayMain() {
           // Check for Cloudflare captcha in shadow DOM
           const shadowCaptchaElements = findInAllShadowRoots('.cf-turnstile, .cf-challenge, .cloudflare-captcha, .captcha-container, .captcha-modal, .captcha-overlay, [data-captcha], cf-chl-widget-eru7g');
 
+          // Check for iframes with Cloudflare challenge URLs
+          const iframes = document.querySelectorAll('iframe');
+          const cloudflareIframes = [];
+          iframes.forEach(iframe => {
+            const src = iframe.src || '';
+            if (src.includes('challenges.cloudflare.com') || 
+                src.includes('cdn-cgi/challenge-platform') || 
+                src.includes('turnstile')) {
+              cloudflareIframes.push(iframe);
+            }
+          });
+
           // Check if any captcha is present and visible
           let captchaVisible = false;
 
           // Check shadow DOM captchas
           shadowCaptchaElements.forEach(element => {
             if (element && element.style.display !== 'none' && element.offsetParent !== null) {
+              captchaVisible = true;
+            }
+          });
+
+          // Check iframe captchas
+          cloudflareIframes.forEach(iframe => {
+            if (iframe && iframe.style.display !== 'none' && iframe.offsetParent !== null) {
               captchaVisible = true;
             }
           });
@@ -618,8 +637,8 @@ function buildOverlayMain() {
           // Captcha is present and visible
           waitCount++;
           const waitTime = waitCount * 30; // Total wait time in seconds
-          updateAutoFillOutput(`🔒 Cloudflare captcha detected in shadow DOM! Waiting (${waitTime}s total)... Please solve the captcha.`);
-          console.log(`Cloudflare captcha detected in shadow DOM, waiting attempt ${waitCount} (${waitTime}s total)...`);
+          updateAutoFillOutput(`🔒 Cloudflare captcha detected (shadow DOM or iframe)! Waiting (${waitTime}s total)... Please solve the captcha.`);
+          console.log(`Cloudflare captcha detected (shadow DOM or iframe), waiting attempt ${waitCount} (${waitTime}s total)...`);
 
           // Wait 30 seconds before checking again
           await new Promise(resolve => setTimeout(resolve, 30000));
