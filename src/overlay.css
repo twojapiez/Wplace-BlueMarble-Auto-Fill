@@ -225,7 +225,8 @@ input[type="file"][id*="template"] {
 
 /* Output status area */
 #bm-output-status,
-#bm-autofill-output {
+#bm-autofill-output,
+#bm-progress-display {
   font-size: small;
   background-color: rgba(0, 0, 0, 0.2);
   padding: 0 0.5ch;
@@ -259,7 +260,8 @@ input[type="file"][id*="template"] {
 #bm-contain-buttons-template,
 div:has(> #bm-input-file-template),
 #bm-output-status,
-#bm-autofill-output {
+#bm-autofill-output,
+#bm-progress-display {
   margin-top: 0.5em;
 }
 

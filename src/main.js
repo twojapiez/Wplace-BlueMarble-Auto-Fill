@@ -560,6 +560,28 @@ function buildOverlayMain() {
         }
       };
 
+      // Helper function to update progress display textarea
+      const updateProgressDisplay = (remainingPixels) => {
+        const textarea = document.querySelector('#bm-progress-display');
+        const estimatedTimeSeconds = remainingPixels * 30
+        if (textarea) {
+          let content = `Remaining Pixels: ${remainingPixels.toLocaleString()}`;
+          
+          if (estimatedTimeSeconds !== null && estimatedTimeSeconds > 0) {
+            // Format time as hh:mm:ss
+            const hours = Math.floor(estimatedTimeSeconds / 3600);
+            const minutes = Math.floor((estimatedTimeSeconds % 3600) / 60);
+            const seconds = Math.floor(estimatedTimeSeconds % 60);
+            const formattedTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            content += `\nEstimated Time: ${formattedTime}`;
+          } else {
+            content += '\nEstimated Time: Calculating...';
+          }
+          
+          textarea.value = content;
+        }
+      };
+
       // Helper function to find elements in shadow DOM
       function findInAllShadowRoots(selector) {
         const results = [];
@@ -1051,7 +1073,11 @@ function buildOverlayMain() {
         const totalPixelsFound = allPixelsToPlace.length;
         console.log(`\n📊 SUMMARY: Found ${totalPixelsFound} total pixels that need placement (filtered by ${ownedColors.length} owned colors), returning ${totalPixelsAdded} pixels (${shuffledBlackPixels.length} black priority)`);
 
-        return result;
+        // Return both the chunk groups and the total remaining pixels count
+        return {
+          chunkGroups: result,
+          totalRemainingPixels: totalPixelsFound
+        };
       };
 
       const placePixelsWithInterceptor = async (chunkCoords, pixels, retryCount = 0) => {
@@ -1201,76 +1227,76 @@ function buildOverlayMain() {
             }
 
             console.log(`AUTOFILL: Current charges: ${charges.count}/${charges.max}`);
-            if (charges.count < charges.max) {
-              console.log("AUTOFILL: Charges not full, forcing user data update");
-              // Force update user data to get latest charge information
-              await forceUpdateUserData();
+            // if (charges.count < charges.max) {
+            //   console.log("AUTOFILL: Charges not full, forcing user data update");
+            //   // Force update user data to get latest charge information
+            //   await forceUpdateUserData();
 
-              // Re-check charges after force update
-              const updatedCharges = instance.apiManager?.charges;
-              if (updatedCharges && updatedCharges.count >= updatedCharges.max) {
-                console.log("AUTOFILL: Charges are now full after update, proceeding");
-                updateAutoFillOutput('✅ Charges are now full after update!');
-                continue; // Skip waiting and proceed with pixel placement
-              }
+            //   // Re-check charges after force update
+            //   const updatedCharges = instance.apiManager?.charges;
+            //   if (updatedCharges && updatedCharges.count >= updatedCharges.max) {
+            //     console.log("AUTOFILL: Charges are now full after update, proceeding");
+            //     updateAutoFillOutput('✅ Charges are now full after update!');
+            //     continue; // Skip waiting and proceed with pixel placement
+            //   }
 
-              console.log("AUTOFILL: Still need to wait for charges, calculating wait time");
-              // Calculate exact wait time based on decimal portion and charges needed
-              const chargesNeeded = charges.max - Math.floor(charges.count);
-              const decimalPortion = charges.count - Math.floor(charges.count);
-              const cooldownMs = charges.cooldownMs || 30000;
+            //   console.log("AUTOFILL: Still need to wait for charges, calculating wait time");
+            //   // Calculate exact wait time based on decimal portion and charges needed
+            //   const chargesNeeded = charges.max - Math.floor(charges.count);
+            //   const decimalPortion = charges.count - Math.floor(charges.count);
+            //   const cooldownMs = charges.cooldownMs || 30000;
 
-              // Calculate time until next full charge
-              const timeToNextCharge = Math.ceil((1 - decimalPortion) * cooldownMs);
+            //   // Calculate time until next full charge
+            //   const timeToNextCharge = Math.ceil((1 - decimalPortion) * cooldownMs);
 
-              // Calculate total wait time for all needed charges
-              const totalWaitTime = timeToNextCharge + ((chargesNeeded - 1) * cooldownMs);
+            //   // Calculate total wait time for all needed charges
+            //   const totalWaitTime = timeToNextCharge + ((chargesNeeded - 1) * cooldownMs);
 
-              console.log(`AUTOFILL: Waiting ${(totalWaitTime/1000).toFixed(1)}s for ${chargesNeeded} charges`);
-              updateAutoFillOutput(`⏱️ Precise timing: ${charges.count.toFixed(3)}/${charges.max} charges, waiting ${formatTime(totalWaitTime / 1000)}`);
+            //   console.log(`AUTOFILL: Waiting ${(totalWaitTime/1000).toFixed(1)}s for ${chargesNeeded} charges`);
+            //   updateAutoFillOutput(`⏱️ Precise timing: ${charges.count.toFixed(3)}/${charges.max} charges, waiting ${formatTime(totalWaitTime / 1000)}`);
 
-              // Wait with progress updates every 5 seconds
-              const startTime = Date.now();
-              const endTime = startTime + totalWaitTime;
-              const halfWayTime = startTime + (totalWaitTime / 2);
-              let hasUpdatedAt50Percent = false;
+            //   // Wait with progress updates every 5 seconds
+            //   const startTime = Date.now();
+            //   const endTime = startTime + totalWaitTime;
+            //   const halfWayTime = startTime + (totalWaitTime / 2);
+            //   let hasUpdatedAt50Percent = false;
 
-              while (Date.now() < endTime && isRunning) {
-                const remaining = Math.max(0, endTime - Date.now());
+            //   while (Date.now() < endTime && isRunning) {
+            //     const remaining = Math.max(0, endTime - Date.now());
 
-                // Force user data update at 50% of waiting time
-                if (!hasUpdatedAt50Percent && Date.now() >= halfWayTime) {
-                  hasUpdatedAt50Percent = true;
-                  console.log("AUTOFILL: Reached 50% of wait time, forcing user data update");
-                  updateAutoFillOutput("🔄 50% wait complete - checking charges via forced update");
-                  await forceUpdateUserData();
+            //     // Force user data update at 50% of waiting time
+            //     if (!hasUpdatedAt50Percent && Date.now() >= halfWayTime) {
+            //       hasUpdatedAt50Percent = true;
+            //       console.log("AUTOFILL: Reached 50% of wait time, forcing user data update");
+            //       updateAutoFillOutput("🔄 50% wait complete - checking charges via forced update");
+            //       await forceUpdateUserData();
                   
-                  // Check if we now have enough charges after the update
-                  const updatedCharges = instance.charges;
-                  if (updatedCharges && updatedCharges.count >= updatedCharges.max) {
-                    console.log("AUTOFILL: Charges are now full after 50% update, breaking wait loop");
-                    updateAutoFillOutput("✅ Charges full after 50% update - proceeding immediately!");
-                    break;
-                  } else {
-                    console.log(`AUTOFILL: After 50% update - charges: ${updatedCharges?.count.toFixed(3)}/${updatedCharges?.max}, continuing wait`);
-                    updateAutoFillOutput(`📊 50% update result: ${updatedCharges?.count.toFixed(3)}/${updatedCharges?.max} charges, continuing wait`);
-                  }
-                }
+            //       // Check if we now have enough charges after the update
+            //       const updatedCharges = instance.charges;
+            //       if (updatedCharges && updatedCharges.count >= updatedCharges.max) {
+            //         console.log("AUTOFILL: Charges are now full after 50% update, breaking wait loop");
+            //         updateAutoFillOutput("✅ Charges full after 50% update - proceeding immediately!");
+            //         break;
+            //       } else {
+            //         console.log(`AUTOFILL: After 50% update - charges: ${updatedCharges?.count.toFixed(3)}/${updatedCharges?.max}, continuing wait`);
+            //         updateAutoFillOutput(`📊 50% update result: ${updatedCharges?.count.toFixed(3)}/${updatedCharges?.max} charges, continuing wait`);
+            //       }
+            //     }
 
-                const remainingTime = formatTime(remaining / 1000);
-                updateAutoFillOutput(`⏳ Charging... ${remainingTime} remaining`);
+            //     const remainingTime = formatTime(remaining / 1000);
+            //     updateAutoFillOutput(`⏳ Charging ${remainingTime} remaining`);
 
-                // Sleep for 1 second or until the end time, whichever is shorter
-                await sleep(Math.min(1000, remaining));
-              }
+            //     // Sleep for 1 second or until the end time, whichever is shorter
+            //     await sleep(Math.min(1000, remaining));
+            //   }
 
-              if (!isRunning) {
-                console.log("AUTOFILL: Stopped during charge wait");
-                break; // Exit if stopped during wait
-              }
-              console.log("AUTOFILL: Charge wait completed, continuing");
-              continue;
-            }
+            //   if (!isRunning) {
+            //     console.log("AUTOFILL: Stopped during charge wait");
+            //     break; // Exit if stopped during wait
+            //   }
+            //   console.log("AUTOFILL: Charge wait completed, continuing");
+            //   continue;
+            // }
 
             console.log("AUTOFILL: Charges are full, proceeding with pixel placement");
             // Get owned colors before finding pixels
@@ -1288,7 +1314,11 @@ function buildOverlayMain() {
             const pixelsToPlaceCount = charges.count;
             console.log(`AUTOFILL: Looking for up to ${pixelsToPlaceCount} pixels to place`);
             updateAutoFillOutput(`⚡ Charges available (${charges.count}/${charges.max}). Finding up to ${pixelsToPlaceCount} pixels from ${ownedColors.length} owned colors...`);
-            const chunkGroups = await getNextPixels(pixelsToPlaceCount, ownedColors);
+            const pixelResult = await getNextPixels(pixelsToPlaceCount, ownedColors);
+            const chunkGroups = pixelResult.chunkGroups;
+
+            // Update progress display with remaining pixels
+            updateProgressDisplay(pixelResult.totalRemainingPixels - charges.max);
 
             console.log(`AUTOFILL: Found ${chunkGroups.length} chunk groups to process`);
             if (chunkGroups.length === 0) {
@@ -1296,11 +1326,13 @@ function buildOverlayMain() {
               isRunning = false;
               button.textContent = 'Auto Fill';
               updateAutoFillOutput('🎉 Template completed! All owned color pixels placed.');
+              updateProgressDisplay(0); // Show completion
               break;
             }
 
-            // Calculate total pixels to place
+            // Calculate total pixels to place in this batch
             const totalPixels = chunkGroups.reduce((sum, group) => sum + group[1].length, 0);
+
             console.log(`AUTOFILL: Will place ${totalPixels} pixels across ${chunkGroups.length} chunks`);
             updateAutoFillOutput(`🎯 Found ${totalPixels} pixels to place in ${chunkGroups.length} chunks`);
 
@@ -1384,6 +1416,7 @@ function buildOverlayMain() {
     .buildElement()
     .addTextarea({ 'id': overlayMain.outputStatusId, 'placeholder': `Status: Sleeping...\nVersion: ${version}`, 'readOnly': true }).buildElement()
     .addTextarea({ 'id': 'bm-autofill-output', 'placeholder': 'Auto-Fill Output:\nWaiting for auto-fill to start...', 'readOnly': true }).buildElement()
+    .addTextarea({ 'id': 'bm-progress-display', 'placeholder': 'Progress:\nWaiting for template analysis...', 'readOnly': true }).buildElement()
     .addDiv({ 'id': 'bm-contain-buttons-action' })
     .addDiv()
     // .addButton({'id': 'bm-button-teleport', 'className': 'bm-help', 'textContent': '✈'}).buildElement()
