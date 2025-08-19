@@ -1318,7 +1318,7 @@ function buildOverlayMain() {
             const chunkGroups = pixelResult.chunkGroups;
 
             // Update progress display with remaining pixels
-            updateProgressDisplay(pixelResult.totalRemainingPixels - charges.max);
+            updateProgressDisplay(pixelResult.totalRemainingPixels - charges.count);
 
             console.log(`AUTOFILL: Found ${chunkGroups.length} chunk groups to process`);
             if (chunkGroups.length === 0) {
