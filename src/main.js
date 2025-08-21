@@ -238,6 +238,8 @@ function observeBlack() {
   observer.observe(document.body, { childList: true, subtree: true });
 }
 
+
+
 /** Deploys the overlay to the page with minimize/maximize functionality.
  * Creates a responsive overlay UI that can toggle between full-featured and minimized states.
  * 
@@ -496,8 +498,15 @@ function buildOverlayMain() {
         instance.handleDisplayStatus(`Enabled templates!`);
         // Enable auto-fill button when templates are enabled
         const autoFillBtn = document.querySelector('#bm-button-autofill');
-        if (autoFillBtn && instance.apiManager?.templateManager?.templatesArray.length && instance.apiManager?.templateManager?.templatesShouldBeDrawn) {
-          autoFillBtn.disabled = false;
+        const modeBtn = document.querySelector('#bm-button-mode');
+        if (instance.apiManager?.templateManager?.templatesArray.length && instance.apiManager?.templateManager?.templatesShouldBeDrawn) {
+          if (autoFillBtn) {
+            autoFillBtn.disabled = false;
+          }
+          if (modeBtn) {
+            modeBtn.disabled = false;
+          }
+
         }
       }
     }).buildElement()
@@ -519,12 +528,6 @@ function buildOverlayMain() {
 
         await templateManager.createTemplate(input.files[0], input.files[0]?.name.replace(/\.[^/.]+$/, ''), [Number(coordTlX.value), Number(coordTlY.value), Number(coordPxX.value), Number(coordPxY.value)]);
 
-        // Enable auto-fill button if templates are enabled
-        const autoFillBtn = document.querySelector('#bm-button-autofill');
-        if (autoFillBtn && instance.apiManager?.templateManager?.templatesShouldBeDrawn && instance.apiManager?.templateManager?.templatesArray.length) {
-          autoFillBtn.disabled = false;
-        }
-
         instance.handleDisplayStatus(`Drew to canvas!`);
       }
     }).buildElement()
@@ -534,8 +537,12 @@ function buildOverlayMain() {
         instance.handleDisplayStatus(`Disabled templates!`);
         // Disable auto-fill button when templates are disabled
         const autoFillBtn = document.querySelector('#bm-button-autofill');
+        const modeBtn = document.querySelector('#bm-button-mode');
         if (autoFillBtn) {
           autoFillBtn.disabled = true;
+        }
+        if (modeBtn) {
+          modeBtn.disabled = true;
         }
       }
     }).buildElement()
@@ -543,6 +550,80 @@ function buildOverlayMain() {
       let isRunning = false;
       const placedPixels = new Set();
       const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+      const colorMap = {
+        0: [0, 0, 0, 0],        // Transparent
+        1: [0, 0, 0, 255],      // Black
+        2: [60, 60, 60, 255],   // Dark Gray
+        3: [120, 120, 120, 255], // Gray
+        4: [210, 210, 210, 255], // Light Gray
+        5: [255, 255, 255, 255], // White
+        6: [96, 0, 24, 255],    // Deep Red
+        7: [237, 28, 36, 255],  // Red
+        8: [255, 127, 39, 255], // Orange
+        9: [246, 170, 9, 255],  // Gold
+        10: [249, 221, 59, 255], // Yellow
+        11: [255, 250, 188, 255], // Light Yellow
+        12: [14, 185, 104, 255], // Dark Green
+        13: [19, 230, 123, 255], // Green
+        14: [135, 255, 94, 255], // Light Green
+        15: [12, 129, 110, 255], // Dark Teal
+        16: [16, 174, 166, 255], // Teal
+        17: [19, 225, 190, 255], // Light Teal
+        18: [40, 80, 158, 255],  // Dark Blue
+        19: [64, 147, 228, 255], // Blue
+        20: [96, 247, 242, 255], // Cyan
+        21: [107, 80, 246, 255], // Indigo
+        22: [153, 177, 251, 255], // Light Indigo
+        23: [120, 12, 153, 255], // Dark Purple
+        24: [170, 56, 185, 255], // Purple
+        25: [224, 159, 249, 255], // Light Purple
+        26: [203, 0, 122, 255],  // Dark Pink
+        27: [236, 31, 128, 255], // Pink
+        28: [243, 141, 169, 255], // Light Pink
+        29: [104, 70, 52, 255],  // Dark Brown
+        30: [149, 104, 42, 255], // Brown
+        31: [248, 178, 119, 255], // Beige
+        32: [170, 170, 170, 255], // Medium Gray
+        33: [165, 14, 30, 255],  // Dark Red
+        34: [250, 128, 114, 255], // Light Red
+        35: [228, 92, 26, 255],  // Dark Orange
+        36: [214, 181, 148, 255], // Light Tan
+        37: [156, 132, 49, 255], // Dark Goldenrod
+        38: [197, 173, 49, 255], // Goldenrod
+        39: [232, 212, 95, 255], // Light Goldenrod
+        40: [74, 107, 58, 255],  // Dark Olive
+        41: [90, 148, 74, 255],  // Olive
+        42: [132, 197, 115, 255], // Light Olive
+        43: [15, 121, 159, 255], // Dark Cyan
+        44: [187, 250, 242, 255], // Light Cyan
+        45: [125, 199, 255, 255], // Light Blue
+        46: [77, 49, 184, 255],  // Dark Indigo
+        47: [74, 66, 132, 255],  // Dark Slate Blue
+        48: [122, 113, 196, 255], // Slate Blue
+        49: [181, 174, 241, 255], // Light Slate Blue
+        50: [219, 164, 99, 255], // Light Brown
+        51: [209, 128, 81, 255], // Dark Beige
+        52: [255, 197, 165, 255], // Light Beige
+        53: [155, 82, 73, 255],  // Dark Peach
+        54: [209, 128, 120, 255], // Peach
+        55: [250, 182, 164, 255], // Light Peach
+        56: [123, 99, 82, 255],  // Dark Tan
+        57: [156, 132, 107, 255], // Tan
+        58: [51, 57, 65, 255],   // Dark Slate
+        59: [109, 117, 141, 255], // Slate
+        60: [179, 185, 209, 255], // Light Slate
+        61: [109, 100, 63, 255], // Dark Stone
+        62: [148, 140, 107, 255], // Stone
+        63: [205, 197, 158, 255]  // Light Stone
+      };
+
+      // Helper function to format seconds as hh:mm:ss
+      const formatTime = (seconds) => {
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+      };
 
       // Helper function to update auto-fill output textarea
       const updateAutoFillOutput = (message) => {
@@ -566,18 +647,13 @@ function buildOverlayMain() {
         const estimatedTimeSeconds = remainingPixels * 30
         if (textarea) {
           let content = `Remaining Pixels: ${remainingPixels.toLocaleString()}`;
-          
+
           if (estimatedTimeSeconds !== null && estimatedTimeSeconds > 0) {
-            // Format time as hh:mm:ss
-            const hours = Math.floor(estimatedTimeSeconds / 3600);
-            const minutes = Math.floor((estimatedTimeSeconds % 3600) / 60);
-            const seconds = Math.floor(estimatedTimeSeconds % 60);
-            const formattedTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-            content += `\nEstimated Time: ${formattedTime}`;
+            content += `\nEstimated Time: ${formatTime(estimatedTimeSeconds)}`;
           } else {
-            content += '\nEstimated Time: Calculating...';
+            content += '\nEstimated Time: N/A';
           }
-          
+
           textarea.value = content;
         }
       };
@@ -620,9 +696,9 @@ function buildOverlayMain() {
           const cloudflareIframes = [];
           iframes.forEach(iframe => {
             const src = iframe.src || '';
-            if (src.includes('challenges.cloudflare.com') || 
-                src.includes('cdn-cgi/challenge-platform') || 
-                src.includes('turnstile')) {
+            if (src.includes('challenges.cloudflare.com') ||
+              src.includes('cdn-cgi/challenge-platform') ||
+              src.includes('turnstile')) {
               cloudflareIframes.push(iframe);
             }
           });
@@ -710,74 +786,6 @@ function buildOverlayMain() {
         }
       };
 
-      // Color mapping from the website's color palette
-      const colorMap = {
-        0: [0, 0, 0, 0],        // Transparent
-        1: [0, 0, 0, 255],      // Black
-        2: [60, 60, 60, 255],   // Dark Gray
-        3: [120, 120, 120, 255], // Gray
-        4: [210, 210, 210, 255], // Light Gray
-        5: [255, 255, 255, 255], // White
-        6: [96, 0, 24, 255],    // Deep Red
-        7: [237, 28, 36, 255],  // Red
-        8: [255, 127, 39, 255], // Orange
-        9: [246, 170, 9, 255],  // Gold
-        10: [249, 221, 59, 255], // Yellow
-        11: [255, 250, 188, 255], // Light Yellow
-        12: [14, 185, 104, 255], // Dark Green
-        13: [19, 230, 123, 255], // Green
-        14: [135, 255, 94, 255], // Light Green
-        15: [12, 129, 110, 255], // Dark Teal
-        16: [16, 174, 166, 255], // Teal
-        17: [19, 225, 190, 255], // Light Teal
-        18: [40, 80, 158, 255],  // Dark Blue
-        19: [64, 147, 228, 255], // Blue
-        20: [96, 247, 242, 255], // Cyan
-        21: [107, 80, 246, 255], // Indigo
-        22: [153, 177, 251, 255], // Light Indigo
-        23: [120, 12, 153, 255], // Dark Purple
-        24: [170, 56, 185, 255], // Purple
-        25: [224, 159, 249, 255], // Light Purple
-        26: [203, 0, 122, 255],  // Dark Pink
-        27: [236, 31, 128, 255], // Pink
-        28: [243, 141, 169, 255], // Light Pink
-        29: [104, 70, 52, 255],  // Dark Brown
-        30: [149, 104, 42, 255], // Brown
-        31: [248, 178, 119, 255], // Beige
-        32: [170, 170, 170, 255], // Medium Gray
-        33: [165, 14, 30, 255],  // Dark Red
-        34: [250, 128, 114, 255], // Light Red
-        35: [228, 92, 26, 255],  // Dark Orange
-        36: [214, 181, 148, 255], // Light Tan
-        37: [156, 132, 49, 255], // Dark Goldenrod
-        38: [197, 173, 49, 255], // Goldenrod
-        39: [232, 212, 95, 255], // Light Goldenrod
-        40: [74, 107, 58, 255],  // Dark Olive
-        41: [90, 148, 74, 255],  // Olive
-        42: [132, 197, 115, 255], // Light Olive
-        43: [15, 121, 159, 255], // Dark Cyan
-        44: [187, 250, 242, 255], // Light Cyan
-        45: [125, 199, 255, 255], // Light Blue
-        46: [77, 49, 184, 255],  // Dark Indigo
-        47: [74, 66, 132, 255],  // Dark Slate Blue
-        48: [122, 113, 196, 255], // Slate Blue
-        49: [181, 174, 241, 255], // Light Slate Blue
-        50: [219, 164, 99, 255], // Light Brown
-        51: [209, 128, 81, 255], // Dark Beige
-        52: [255, 197, 165, 255], // Light Beige
-        53: [155, 82, 73, 255],  // Dark Peach
-        54: [209, 128, 120, 255], // Peach
-        55: [250, 182, 164, 255], // Light Peach
-        56: [123, 99, 82, 255],  // Dark Tan
-        57: [156, 132, 107, 255], // Tan
-        58: [51, 57, 65, 255],   // Dark Slate
-        59: [109, 117, 141, 255], // Slate
-        60: [179, 185, 209, 255], // Light Slate
-        61: [109, 100, 63, 255], // Dark Stone
-        62: [148, 140, 107, 255], // Stone
-        63: [205, 197, 158, 255]  // Light Stone
-      };
-
       async function getOwnedColors() {
         try {
           updateAutoFillOutput('🔍 Checking owned colors...');
@@ -818,7 +826,7 @@ function buildOverlayMain() {
 
           // Step 2: Wait for the color palette container to appear
           let colorPalette = document.evaluate('/html/body/div[1]/div[1]/div[8]/div/div/div[3]/div', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-          
+
           // Wait until the color palette is available (similar to final button waiting)
           let waitCount = 1;
           while (!colorPalette) {
@@ -826,7 +834,7 @@ function buildOverlayMain() {
             updateAutoFillOutput(`⏳ Waiting for color palette to load... (${waitCount})`);
             await sleep(200);
             waitCount++;
-            
+
             // Re-query the color palette in case the DOM changed
             colorPalette = document.evaluate('/html/body/div[1]/div[1]/div[8]/div/div/div[3]/div', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
           }
@@ -922,7 +930,9 @@ function buildOverlayMain() {
         // Cache for fetched chunks to avoid multiple requests
         const chunkCache = new Map();
 
-        // Collect ALL pixels that need placement first
+        // Collect ALL pixels that exist in the template (for edge detection)
+        const allTemplatePixels = [];
+        // Collect ALL pixels that need placement
         const allPixelsToPlace = [];
 
         // Process ALL pixels first, regardless of count
@@ -978,12 +988,6 @@ function buildOverlayMain() {
               const templateB = templateImageData.data[templatePixelIndex + 2];
               const templateColorId = getColorIdFromRGB(templateR, templateG, templateB, templateAlpha);
 
-              // Skip pixels with colors we don't own
-              if (ownedColors.length > 0 && !ownedColorsSet.has(templateColorId)) {
-                // console.log(`🔒 SKIPPING pixel at (${absX}, ${absY}) - Color ${templateColorId} not owned`);
-                continue;
-              }
-
               // Calculate "crushed down" coordinates - convert 3x3 grid position to logical position
               const logicalX = Math.floor((x - 1) / 3); // Convert bitmap x to logical x (0, 1, 2, ...)
               const logicalY = Math.floor((y - 1) / 3); // Convert bitmap y to logical y (0, 1, 2, ...)
@@ -992,6 +996,22 @@ function buildOverlayMain() {
               const finalLogicalX = tilePixelX + logicalX;
               const finalLogicalY = tilePixelY + logicalY;
               const pixelKey = `${chunkX},${chunkY},${finalLogicalX},${finalLogicalY}`;
+
+              // Add ALL template pixels to our comprehensive set (for edge detection)
+              allTemplatePixels.push({
+                  chunkX,
+                  chunkY,
+                  finalLogicalX,
+                  finalLogicalY,
+                  templateColorId,
+                  pixelKey
+                });
+
+              // Skip pixels with colors we don't own
+              if (ownedColors.length > 0 && !ownedColorsSet.has(templateColorId)) {
+                // console.log(`🔒 SKIPPING pixel at (${absX}, ${absY}) - Color ${templateColorId} not owned`);
+                continue;
+              }
 
               // Check if pixel is already placed correctly
               let needsPlacement = true;
@@ -1029,27 +1049,79 @@ function buildOverlayMain() {
           }
         }
 
-        // Sort pixels: black pixels (color ID 1) first, then randomize within each group
-        const blackPixels = allPixelsToPlace.filter(pixel => pixel.templateColorId === 1);
-        const nonBlackPixels = allPixelsToPlace.filter(pixel => pixel.templateColorId !== 1);
+        // Get current mode from the mode button
+        const modeBtn = document.querySelector('#bm-button-mode');
+        const currentMode = modeBtn ? modeBtn.textContent.replace('Mode: ', '') : 'Random';
 
-        // Shuffle both arrays randomly
-        const shuffleArray = (array) => {
-          const shuffled = [...array];
-          for (let i = shuffled.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        // Helper function to check if a pixel is on the edge of the template
+        const isEdgePixel = (pixel) => {
+          // Check if this pixel has any neighboring position that would be outside the template
+          // A pixel is on the edge if any of its 8 neighboring positions are not in the template
+
+          // Convert to global coordinates (chunk size is 1000x1000)
+          const globalX = (pixel.chunkX * 1000) + pixel.finalLogicalX;
+          const globalY = (pixel.chunkY * 1000) + pixel.finalLogicalY;
+
+          // Define the 8 neighboring positions in global coordinates (including diagonals)
+          const neighbors = [
+            [globalX - 1, globalY - 1], // Top-left
+            [globalX, globalY - 1],     // Top
+            [globalX + 1, globalY - 1], // Top-right
+            [globalX - 1, globalY],     // Left
+            [globalX + 1, globalY],     // Right
+            [globalX - 1, globalY + 1], // Bottom-left
+            [globalX, globalY + 1],     // Bottom
+            [globalX + 1, globalY + 1]  // Bottom-right
+          ];
+
+          // Check if any neighbor position is missing from our ALL template pixels
+          for (const [neighGlobalX, neighGlobalY] of neighbors) {
+            // Convert neighbor global coordinates back to chunk coordinates
+            const neighChunkX = Math.floor(neighGlobalX / 1000);
+            const neighChunkY = Math.floor(neighGlobalY / 1000);
+            const neighLogicalX = neighGlobalX - (neighChunkX * 1000);
+            const neighLogicalY = neighGlobalY - (neighChunkY * 1000);
+
+            const neighborKey = `${neighChunkX},${neighChunkY},${neighLogicalX},${neighLogicalY}`;
+
+            // Check if this neighbor exists in our complete template pixel set
+            if (!allTemplatePixels.some(pixel => pixel.pixelKey === neighborKey)) {
+              return true; // Missing neighbor means this pixel is on the edge
+            }
           }
-          return shuffled;
+
+          return false; // All neighbors exist, so this is an interior pixel
         };
 
-        const shuffledBlackPixels = shuffleArray(blackPixels);
-        const shuffledNonBlackPixels = shuffleArray(nonBlackPixels);
+        // Separate edge pixels from non-edge pixels (edge pixels have highest priority)
+        const edgePixels = allPixelsToPlace.filter(pixel => isEdgePixel(pixel));
+        const allEdgePixels = allTemplatePixels.filter(pixel => isEdgePixel(pixel));
+        const nonEdgePixels = allPixelsToPlace.filter(pixel => !isEdgePixel(pixel));
 
-        // Combine: black pixels first, then other pixels
-        const prioritizedPixels = [...shuffledBlackPixels, ...shuffledNonBlackPixels];
+        // Debug log to see what we're working with
+        console.log(`DEBUG: Total pixels to place: ${allPixelsToPlace.length}, Edge pixels: ${edgePixels.length}, Non-edge pixels: ${nonEdgePixels.length}`);
 
-        console.log(`🎲 Randomized pixel order: ${shuffledBlackPixels.length} black pixels first, then ${shuffledNonBlackPixels.length} other pixels`);
+        // Sort pixels based on selected mode
+        let prioritizedPixels = [];
+
+        if (currentMode === 'Scan') {
+          // For now, sort all pixels together in scan-line order
+          prioritizedPixels = [...edgePixels, ...nonEdgePixels];
+          console.log(`📏 Scan mode: ${prioritizedPixels.length} total pixels in top-left to bottom-right scan order`);
+        } else { // Random mode
+          // Shuffle both arrays randomly
+          const shuffleArray = (array) => {
+            const shuffled = [...array];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+              const j = Math.floor(Math.random() * (i + 1));
+              [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+            return shuffled;
+          };
+
+          prioritizedPixels = [...shuffleArray(edgePixels), ...shuffleArray(nonEdgePixels)];
+          console.log(`🎲 Random mode: ${edgePixels.length} edge pixels first (randomized), then ${nonEdgePixels.length} inner pixels (randomized)`);
+        }
 
         // Group pixels by chunk and apply count limit
         let totalPixelsAdded = 0;
@@ -1067,25 +1139,21 @@ function buildOverlayMain() {
           totalPixelsAdded++;
         }
 
-        // Convert chunk groups to the desired format
-        const result = Object.values(chunkGroups).map(group => [group.chunkCoords, group.pixels]);
 
-        const totalPixelsFound = allPixelsToPlace.length;
-        console.log(`\n📊 SUMMARY: Found ${totalPixelsFound} total pixels that need placement (filtered by ${ownedColors.length} owned colors), returning ${totalPixelsAdded} pixels (${shuffledBlackPixels.length} black priority)`);
+        console.log(`\n📊 SUMMARY: Found ${allPixelsToPlace.length} total pixels that need placement (filtered by ${ownedColors.length} owned colors), returning ${totalPixelsAdded} pixels (${edgePixels.length} edge priority)`);
 
         // Return both the chunk groups and the total remaining pixels count
         return {
-          chunkGroups: result,
-          totalRemainingPixels: totalPixelsFound
+          // Convert chunk groups to the desired format
+          chunkGroups: Object.values(chunkGroups).map(group => [group.chunkCoords, group.pixels]),
+          totalRemainingPixels: allPixelsToPlace.length
         };
       };
 
-      const placePixelsWithInterceptor = async (chunkCoords, pixels, retryCount = 0) => {
-        if (!pixels || pixels.length === 0) return;
+      // Helper function to intercept fetch requests for pixel placement
+      const interceptFetchRequest = async (requestBodyBuilder, triggerAction, logPrefix = "REQUEST") => {
         const originalFetch = unsafeWindow.fetch;
         let interceptionActive = true;
-
-        const [chunkX, chunkY] = chunkCoords;
 
         return new Promise(async (resolve, reject) => {
           unsafeWindow.fetch = async (...args) => {
@@ -1099,44 +1167,27 @@ function buildOverlayMain() {
 
             if (method === 'POST' && typeof url === 'string' && url.includes('/pixel/')) {
               try {
-                console.log("Pixel: Intercepting Request")
+                console.log(`${logPrefix}: Intercepting fetch request`);
                 const originalBody = JSON.parse(options.body);
                 const token = originalBody['t'];
                 if (!token) {
                   throw new Error("Could not find security token 't'");
                 }
 
-                const newBody = {
-                  colors: pixels.map(([, , colorId]) => colorId),
-                  coords: pixels.flatMap(([logicalX, logicalY]) => [logicalX, logicalY]),
-                  t: token
-                };
-
-                const newUrl = `https://backend.wplace.live/s0/pixel/${chunkX}/${chunkY}`;
+                // Build the new request body using the provided builder function
+                const { newBody, newUrl } = requestBodyBuilder(originalBody, token, url);
                 const newOptions = { ...options, body: JSON.stringify(newBody) };
 
                 interceptionActive = false;
                 unsafeWindow.fetch = originalFetch;
-                const result = await originalFetch.call(unsafeWindow, newUrl, newOptions);
-
-                // Check for rate limiting (429 status code)
-                if (result.status === 429) {
-                  console.log(`Rate limited (429) on chunk ${chunkX},${chunkY}. Waiting 30s before retry...`);
-                  updateAutoFillOutput(`⏰ Rate limited! Waiting 30s before retry (attempt ${retryCount + 1})...`);
-
-                  // Wait 30 seconds
-                  await new Promise(resolve => setTimeout(resolve, 30000));
-
-                  // Retry the pixel placement
-                  updateAutoFillOutput(`🔄 Retrying pixel placement for chunk ${chunkX},${chunkY}...`);
-                  resolve(await placePixelsWithInterceptor(chunkCoords, pixels, retryCount + 1));
-                  return;
-                }
-
+                console.log(`${logPrefix}: Sending modified request`);
+                const result = await originalFetch.call(unsafeWindow, newUrl || url, newOptions);
                 resolve(result);
+                return result;
               } catch (e) {
                 interceptionActive = false;
                 unsafeWindow.fetch = originalFetch;
+                console.error(`${logPrefix}: Error during interception:`, e);
                 reject(e);
               }
             } else {
@@ -1144,41 +1195,9 @@ function buildOverlayMain() {
             }
           };
 
-          // Trigger the paint process
+          // Execute the trigger action that will cause the fetch request
           try {
-
-            const canvas = document.querySelector('.maplibregl-canvas');
-            if (!canvas) throw new Error("Could not find the map canvas.");
-
-            const clickX = window.innerWidth / 2;
-            const clickY = window.innerHeight / 2;
-            const events = ['mousedown', 'click', 'mouseup'];
-            for (const type of events) {
-              const event = new MouseEvent(type, { clientX: clickX, clientY: clickY, bubbles: true });
-              canvas.dispatchEvent(event);
-              await sleep(50);
-            }
-            console.log("Pixel: Starting...")
-            let finalButton = document.evaluate('/html/body/div/div[1]/div[8]/div/div/div[3]/div[1]/button', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-            
-            // Wait until the final button is available and enabled (similar to the main waiting logic)
-            let waitCount = 1;
-            while (!finalButton || finalButton.disabled) {
-              console.log(`PIXEL: Waiting for final button to be ready... (${waitCount})`);
-              updateAutoFillOutput(`⏳ Waiting for pixel placement button to be ready... (${waitCount})`);
-              await sleep(200);
-              waitCount++;
-              
-              // Re-query the button in case the DOM changed
-              const refreshedButton = document.evaluate('/html/body/div/div[1]/div[8]/div/div/div[3]/div[1]/button', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-              if (refreshedButton) {
-                finalButton = refreshedButton;
-              }
-            }
-            
-            if (!finalButton) throw new Error("Could not find the final paint button.");
-            console.log("PIXEL: Final button is ready - clicking now");
-            finalButton.click();
+            await triggerAction();
           } catch (error) {
             unsafeWindow.fetch = originalFetch;
             reject(error);
@@ -1186,16 +1205,69 @@ function buildOverlayMain() {
         });
       };
 
+      const placePixelsWithInterceptor = async (chunkCoords, pixels, retryCount = 0) => {
+        if (!pixels || pixels.length === 0) return;
+        const [chunkX, chunkY] = chunkCoords;
 
-      button.onclick = async () => {
-        // Helper function to format seconds as hh:mm:ss
-        const formatTime = (seconds) => {
-          const hours = Math.floor(seconds / 3600);
-          const minutes = Math.floor((seconds % 3600) / 60);
-          const secs = Math.floor(seconds % 60);
-          return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        const requestBodyBuilder = (originalBody, token, url) => {
+          const newBody = {
+            colors: pixels.map(([, , colorId]) => colorId),
+            coords: pixels.flatMap(([logicalX, logicalY]) => [logicalX, logicalY]),
+            t: token
+          };
+          const newUrl = `https://backend.wplace.live/s0/pixel/${chunkX}/${chunkY}`;
+          return { newBody, newUrl };
         };
 
+        const triggerAction = async () => {
+          const canvas = document.querySelector('.maplibregl-canvas');
+          if (!canvas) throw new Error("Could not find the map canvas.");
+
+          const clickX = window.innerWidth / 2;
+          const clickY = window.innerHeight / 2;
+          const events = ['mousedown', 'click', 'mouseup'];
+          for (const type of events) {
+            const event = new MouseEvent(type, { clientX: clickX, clientY: clickY, bubbles: true });
+            canvas.dispatchEvent(event);
+            await sleep(50);
+          }
+          console.log("AUTOFILL: Starting...")
+          let finalButton = document.querySelector('.btn.btn-primary.btn-lg.sm\\:btn-xl.relative');
+
+          // Wait until the final button is available and enabled
+          let waitCount = 1;
+          while (!finalButton || finalButton.disabled) {
+            console.log(`AUTOFILL: Waiting for final button to be ready... (${waitCount})`);
+            updateAutoFillOutput(`⏳ Waiting for pixel placement button to be ready... (${waitCount})`);
+            await sleep(200);
+            waitCount++;
+          }
+
+          if (!finalButton) throw new Error("Could not find the final paint button.");
+          console.log("AUTOFILL: Final button is ready - clicking now");
+          finalButton.click();
+        };
+
+        try {
+          const result = await interceptFetchRequest(requestBodyBuilder, triggerAction, "AUTOFILL");
+
+          // Check for rate limiting (429 status code)
+          if (result.status === 429) {
+            console.log(`Rate limited (429) on chunk ${chunkX},${chunkY}. Waiting 30s before retry...`);
+            updateAutoFillOutput(`⏰ Rate limited! Waiting 30s before retry (attempt ${retryCount + 1})...`);
+            await new Promise(resolve => setTimeout(resolve, 30000));
+            updateAutoFillOutput(`🔄 Retrying pixel placement for chunk ${chunkX},${chunkY}...`);
+            return await placePixelsWithInterceptor(chunkCoords, pixels, retryCount + 1);
+          }
+
+          return result;
+        } catch (error) {
+          throw error;
+        }
+      };
+
+
+      button.onclick = async () => {
         if (isRunning) {
           console.log("AUTOFILL: User requested stop");
           isRunning = false;
@@ -1252,7 +1324,7 @@ function buildOverlayMain() {
               // Calculate total wait time for all needed charges
               const totalWaitTime = timeToNextCharge + ((chargesNeeded - 1) * cooldownMs);
 
-              console.log(`AUTOFILL: Waiting ${(totalWaitTime/1000).toFixed(1)}s for ${chargesNeeded} charges`);
+              console.log(`AUTOFILL: Waiting ${(totalWaitTime / 1000).toFixed(1)}s for ${chargesNeeded} charges`);
               updateAutoFillOutput(`⏱️ Precise timing: ${charges.count.toFixed(3)}/${charges.max} charges, waiting ${formatTime(totalWaitTime / 1000)}`);
 
               // Wait with progress updates every 5 seconds
@@ -1270,7 +1342,7 @@ function buildOverlayMain() {
                   console.log("AUTOFILL: Reached 50% of wait time, forcing user data update");
                   updateAutoFillOutput("🔄 50% wait complete - checking charges via forced update");
                   await forceUpdateUserData();
-                  
+
                   // Check if we now have enough charges after the update
                   const updatedCharges = instance.charges;
                   if (updatedCharges && updatedCharges.count >= updatedCharges.max) {
@@ -1311,18 +1383,22 @@ function buildOverlayMain() {
               continue;
             }
 
-            const pixelsToPlaceCount = charges.count;
-            console.log(`AUTOFILL: Looking for up to ${pixelsToPlaceCount} pixels to place`);
-            updateAutoFillOutput(`⚡ Charges available (${charges.count}/${charges.max}). Finding up to ${pixelsToPlaceCount} pixels from ${ownedColors.length} owned colors...`);
-            const pixelResult = await getNextPixels(pixelsToPlaceCount, ownedColors);
+            console.log(`AUTOFILL: Looking for up to ${charges.count} pixels to place`);
+            updateAutoFillOutput(`⚡ Charges available (${charges.count}/${charges.max}). Finding up to ${charges.count} pixels from ${ownedColors.length} owned colors...`);
+            const pixelResult = await getNextPixels(charges.count, ownedColors);
             const chunkGroups = pixelResult.chunkGroups;
 
-            // Update progress display with remaining pixels
-            updateProgressDisplay(pixelResult.totalRemainingPixels - charges.count);
 
             console.log(`AUTOFILL: Found ${chunkGroups.length} chunk groups to process`);
             if (chunkGroups.length === 0) {
               console.log("AUTOFILL: Template completed - no more pixels to place");
+              console.log("AUTOFILL: Closing Paint Menu");
+              updateAutoFillOutput('🎨 Closing Paint Menu...');
+              const parentDiv = document.querySelector('.relative.px-3');
+              const closeButton = parentDiv.querySelector('.btn.btn-circle.btn-sm svg path[d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"]')?.closest('button');
+              if (closeButton) {
+                closeButton.click();
+              }
               isRunning = false;
               button.textContent = 'Auto Fill';
               updateAutoFillOutput('🎉 Template completed! All owned color pixels placed.');
@@ -1333,17 +1409,46 @@ function buildOverlayMain() {
             // Calculate total pixels to place in this batch
             const totalPixels = chunkGroups.reduce((sum, group) => sum + group[1].length, 0);
 
+            // Update progress display with remaining pixels
+            updateProgressDisplay(pixelResult.totalRemainingPixels - totalPixels);
+
             console.log(`AUTOFILL: Will place ${totalPixels} pixels across ${chunkGroups.length} chunks`);
             updateAutoFillOutput(`🎯 Found ${totalPixels} pixels to place in ${chunkGroups.length} chunks`);
 
-            for (const chunkGroup of chunkGroups) {
+            for (let chunkIndex = 0; chunkIndex < chunkGroups.length; chunkIndex++) {
               if (!isRunning) {
                 console.log("AUTOFILL: Stopped during chunk processing");
                 break;
               }
 
+              const chunkGroup = chunkGroups[chunkIndex];
               const [chunkCoords, pixels] = chunkGroup;
               const [chunkX, chunkY] = chunkCoords;
+
+              // For chunks after the first one and before the last one, reopen the paint menu
+              console.log(`AUTOFILL: ChunkIndex: ${chunkIndex}`);
+              if (chunkIndex > 0) {
+                console.log(`AUTOFILL: Reopening paint menu for chunk ${chunkIndex + 1}/${chunkGroups.length}`);
+                updateAutoFillOutput(`🎨 Reopening paint menu for chunk ${chunkIndex + 1}...`);
+
+                // Wait until the paint button is available
+                let paintButton = document.querySelector('.btn.btn-primary.btn-lg.sm\\:btn-xl.relative.z-30');
+                let waitCount = 1;
+
+                while (!paintButton) {
+                  console.log(`AUTOFILL: Waiting for paint button to appear for chunk ${chunkIndex + 1}... (${waitCount})`);
+                  updateAutoFillOutput(`⏳ Waiting for paint button to appear for chunk ${chunkIndex + 1}... (${waitCount})`);
+                  await sleep(200);
+                  waitCount++;
+
+                  // Re-query the paint button in case the DOM changed
+                  paintButton = document.querySelector('.btn.btn-primary.btn-lg.sm\\:btn-xl.relative.z-30');
+                }
+
+                paintButton.click();
+                updateAutoFillOutput(`✅ Paint menu reopened for chunk ${chunkIndex + 1}`);
+                await sleep(200); // Wait for the UI to update
+              }
 
               console.log(`AUTOFILL: Processing chunk ${chunkX},${chunkY} with ${pixels.length} pixels`);
               updateAutoFillOutput(`🔄 Placing ${pixels.length} pixels in chunk ${chunkX},${chunkY}...`);
@@ -1351,50 +1456,9 @@ function buildOverlayMain() {
               console.log("AUTOFILL: Finished Intercept")
               pixels.forEach(([logicalX, logicalY]) => placedPixels.add(`${chunkX},${chunkY},${logicalX},${logicalY}`));
               updateAutoFillOutput(`✅ Placed ${pixels.length} pixels in chunk (${chunkX},${chunkY})`);
-              await sleep(500); // Small delay between chunk requests
             }
 
             console.log(`AUTOFILL: Completed placing ${totalPixels} pixels, starting UI cleanup`);
-            // Click the final button again (To update the game UI)
-            console.log("AUTOFILL: Clearing...")
-            let finalButton = document.querySelector('.btn.btn-primary.btn-lg.sm\\:btn-xl.relative');
-
-            await sleep(2000);
-            console.log(`AUTOFILL: Final button found: ${finalButton ? 'Yes' : 'No'}`);
-
-            // Wait until the final button is not disabled (infinitely)
-            let waitCount = 1;
-            while (finalButton && finalButton.disabled) {
-              console.log(`AUTOFILL: Waiting for final button to be enabled... (${waitCount})`);
-              updateAutoFillOutput(`⏳ Waiting for paint button to be ready... (${waitCount})`);
-              await sleep(200);
-              waitCount++;
-              
-              // Re-query the button in case the DOM changed
-              const refreshedButton = document.querySelector('.btn.btn-primary.btn-lg.sm\\:btn-xl.relative');
-              if (refreshedButton) {
-                finalButton = refreshedButton;
-              }
-            }
-
-            if (finalButton && !finalButton.disabled) {
-              console.log("AUTOFILL: Final button is ready - clicking now");
-              updateAutoFillOutput(`✅ Paint button ready - clicking to finalize pixels`);
-              finalButton.click();
-              console.log("AUTOFILL: Final button clicked successfully");
-            } else {
-              console.warn("AUTOFILL: Final button not found");
-              updateAutoFillOutput(`❌ Paint button not found`);
-            }
-
-            await sleep(300);
-            console.log("AUTOFILL: Closing...")
-            // Resetting our position by closing paint menu
-            const parentDiv = document.querySelector('.relative.px-3');
-            const closeButton = parentDiv ? parentDiv.querySelector('.btn.btn-circle.btn-sm svg path[d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"]')?.closest('button') : null;
-            if (closeButton) {
-              closeButton.click();
-            }
 
             if (isRunning) {
               console.log(`AUTOFILL: Batch completed successfully - ${totalPixels} pixels placed`);
@@ -1413,15 +1477,21 @@ function buildOverlayMain() {
         }
       };
     }).buildElement()
+    .addButton({ 'id': 'bm-button-mode', 'textContent': 'Mode: Scan', 'disabled': true }, (instance, button) => {
+      const modes = ['Scan', 'Random'];
+      let currentModeIndex = 0;
+
+      button.onclick = () => {
+        currentModeIndex = (currentModeIndex + 1) % modes.length;
+        button.textContent = `Mode: ${modes[currentModeIndex]}`;
+      };
+    }).buildElement()
     .buildElement()
     .addTextarea({ 'id': overlayMain.outputStatusId, 'placeholder': `Status: Sleeping...\nVersion: ${version}`, 'readOnly': true }).buildElement()
     .addTextarea({ 'id': 'bm-autofill-output', 'placeholder': 'Auto-Fill Output:\nWaiting for auto-fill to start...', 'readOnly': true }).buildElement()
     .addTextarea({ 'id': 'bm-progress-display', 'placeholder': 'Progress:\nWaiting for template analysis...', 'readOnly': true }).buildElement()
     .addDiv({ 'id': 'bm-contain-buttons-action' })
     .addDiv()
-    // .addButton({'id': 'bm-button-teleport', 'className': 'bm-help', 'textContent': '✈'}).buildElement()
-    // .addButton({'id': 'bm-button-favorite', 'className': 'bm-help', 'innerHTML': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><polygon points="10,2 12,7.5 18,7.5 13.5,11.5 15.5,18 10,14 4.5,18 6.5,11.5 2,7.5 8,7.5" fill="white"></polygon></svg>'}).buildElement()
-    // .addButton({'id': 'bm-button-templates', 'className': 'bm-help', 'innerHTML': '🖌'}).buildElement()
     .addButton({ 'id': 'bm-button-convert', 'className': 'bm-help', 'innerHTML': '🎨', 'title': 'Template Color Converter' },
       (instance, button) => {
         button.addEventListener('click', () => {
@@ -1433,28 +1503,19 @@ function buildOverlayMain() {
     .buildElement()
     .buildElement()
     .buildOverlay(document.body);
-}
 
-function buildOverlayTabTemplate() {
-  overlayTabTemplate.addDiv({ 'id': 'bm-tab-template', 'style': 'top: 20%; left: 10%;' })
-    .addDiv()
-    .addDiv({ 'className': 'bm-dragbar' }).buildElement()
-    .addButton({ 'className': 'bm-button-minimize', 'textContent': '↑' },
-      (instance, button) => {
-        button.onclick = () => {
-          let isMinimized = false;
-          if (button.textContent == '↑') {
-            button.textContent = '↓';
-          } else {
-            button.textContent = '↑';
-            isMinimized = true;
-          }
-
-
-        }
+  // Enable / Disable Auto Fill button based on if we have a template and if it should be drawn or not
+  setTimeout(() => {
+    const autoFillBtn = document.querySelector('#bm-button-autofill');
+    const modeBtn = document.querySelector('#bm-button-mode');
+    if (autoFillBtn) {
+      if (overlayMain.apiManager?.templateManager?.templatesArray.length && overlayMain.apiManager?.templateManager?.templatesShouldBeDrawn) {
+        autoFillBtn.disabled = false;
+        modeBtn.disabled = false;
+      } else {
+        autoFillBtn.disabled = true;
+        modeBtn.disabled = true;
       }
-    ).buildElement()
-    .buildElement()
-    .buildElement()
-    .buildOverlay();
+    }
+  }, 0)
 }
