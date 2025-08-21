@@ -931,7 +931,7 @@ function buildOverlayMain() {
         const chunkCache = new Map();
 
         // Collect ALL pixels that exist in the template (for edge detection)
-        const allTemplatePixels = [];
+        const allTemplatePixels = new Set();
         // Collect ALL pixels that need placement
         const allPixelsToPlace = [];
 
@@ -998,14 +998,7 @@ function buildOverlayMain() {
               const pixelKey = `${chunkX},${chunkY},${finalLogicalX},${finalLogicalY}`;
 
               // Add ALL template pixels to our comprehensive set (for edge detection)
-              allTemplatePixels.push({
-                  chunkX,
-                  chunkY,
-                  finalLogicalX,
-                  finalLogicalY,
-                  templateColorId,
-                  pixelKey
-                });
+              allTemplatePixels.add(pixelKey);
 
               // Skip pixels with colors we don't own
               if (ownedColors.length > 0 && !ownedColorsSet.has(templateColorId)) {
@@ -1055,6 +1048,7 @@ function buildOverlayMain() {
 
         // Helper function to check if a pixel is on the edge of the template
         const isEdgePixel = (pixel) => {
+          console.log("AUTOFILL: Ran Edge Pixel")
           // Check if this pixel has any neighboring position that would be outside the template
           // A pixel is on the edge if any of its 8 neighboring positions are not in the template
 
@@ -1085,7 +1079,7 @@ function buildOverlayMain() {
             const neighborKey = `${neighChunkX},${neighChunkY},${neighLogicalX},${neighLogicalY}`;
 
             // Check if this neighbor exists in our complete template pixel set
-            if (!allTemplatePixels.some(pixel => pixel.pixelKey === neighborKey)) {
+            if (!allTemplatePixels.has(neighborKey)) {
               return true; // Missing neighbor means this pixel is on the edge
             }
           }
@@ -1095,7 +1089,6 @@ function buildOverlayMain() {
 
         // Separate edge pixels from non-edge pixels (edge pixels have highest priority)
         const edgePixels = allPixelsToPlace.filter(pixel => isEdgePixel(pixel));
-        const allEdgePixels = allTemplatePixels.filter(pixel => isEdgePixel(pixel));
         const nonEdgePixels = allPixelsToPlace.filter(pixel => !isEdgePixel(pixel));
 
         // Debug log to see what we're working with
@@ -1299,76 +1292,76 @@ function buildOverlayMain() {
             }
 
             console.log(`AUTOFILL: Current charges: ${charges.count}/${charges.max}`);
-            if (charges.count < charges.max) {
-              console.log("AUTOFILL: Charges not full, forcing user data update");
-              // Force update user data to get latest charge information
-              await forceUpdateUserData();
+            // if (charges.count < charges.max) {
+            //   console.log("AUTOFILL: Charges not full, forcing user data update");
+            //   // Force update user data to get latest charge information
+            //   await forceUpdateUserData();
 
-              // Re-check charges after force update
-              const updatedCharges = instance.apiManager?.charges;
-              if (updatedCharges && updatedCharges.count >= updatedCharges.max) {
-                console.log("AUTOFILL: Charges are now full after update, proceeding");
-                updateAutoFillOutput('✅ Charges are now full after update!');
-                continue; // Skip waiting and proceed with pixel placement
-              }
+            //   // Re-check charges after force update
+            //   const updatedCharges = instance.apiManager?.charges;
+            //   if (updatedCharges && updatedCharges.count >= updatedCharges.max) {
+            //     console.log("AUTOFILL: Charges are now full after update, proceeding");
+            //     updateAutoFillOutput('✅ Charges are now full after update!');
+            //     continue; // Skip waiting and proceed with pixel placement
+            //   }
 
-              console.log("AUTOFILL: Still need to wait for charges, calculating wait time");
-              // Calculate exact wait time based on decimal portion and charges needed
-              const chargesNeeded = charges.max - Math.floor(charges.count);
-              const decimalPortion = charges.count - Math.floor(charges.count);
-              const cooldownMs = charges.cooldownMs || 30000;
+            //   console.log("AUTOFILL: Still need to wait for charges, calculating wait time");
+            //   // Calculate exact wait time based on decimal portion and charges needed
+            //   const chargesNeeded = charges.max - Math.floor(charges.count);
+            //   const decimalPortion = charges.count - Math.floor(charges.count);
+            //   const cooldownMs = charges.cooldownMs || 30000;
 
-              // Calculate time until next full charge
-              const timeToNextCharge = Math.ceil((1 - decimalPortion) * cooldownMs);
+            //   // Calculate time until next full charge
+            //   const timeToNextCharge = Math.ceil((1 - decimalPortion) * cooldownMs);
 
-              // Calculate total wait time for all needed charges
-              const totalWaitTime = timeToNextCharge + ((chargesNeeded - 1) * cooldownMs);
+            //   // Calculate total wait time for all needed charges
+            //   const totalWaitTime = timeToNextCharge + ((chargesNeeded - 1) * cooldownMs);
 
-              console.log(`AUTOFILL: Waiting ${(totalWaitTime / 1000).toFixed(1)}s for ${chargesNeeded} charges`);
-              updateAutoFillOutput(`⏱️ Precise timing: ${charges.count.toFixed(3)}/${charges.max} charges, waiting ${formatTime(totalWaitTime / 1000)}`);
+            //   console.log(`AUTOFILL: Waiting ${(totalWaitTime / 1000).toFixed(1)}s for ${chargesNeeded} charges`);
+            //   updateAutoFillOutput(`⏱️ Precise timing: ${charges.count.toFixed(3)}/${charges.max} charges, waiting ${formatTime(totalWaitTime / 1000)}`);
 
-              // Wait with progress updates every 5 seconds
-              const startTime = Date.now();
-              const endTime = startTime + totalWaitTime;
-              const halfWayTime = startTime + (totalWaitTime / 2);
-              let hasUpdatedAt50Percent = false;
+            //   // Wait with progress updates every 5 seconds
+            //   const startTime = Date.now();
+            //   const endTime = startTime + totalWaitTime;
+            //   const halfWayTime = startTime + (totalWaitTime / 2);
+            //   let hasUpdatedAt50Percent = false;
 
-              while (Date.now() < endTime && isRunning) {
-                const remaining = Math.max(0, endTime - Date.now());
+            //   while (Date.now() < endTime && isRunning) {
+            //     const remaining = Math.max(0, endTime - Date.now());
 
-                // Force user data update at 50% of waiting time
-                if (!hasUpdatedAt50Percent && Date.now() >= halfWayTime) {
-                  hasUpdatedAt50Percent = true;
-                  console.log("AUTOFILL: Reached 50% of wait time, forcing user data update");
-                  updateAutoFillOutput("🔄 50% wait complete - checking charges via forced update");
-                  await forceUpdateUserData();
+            //     // Force user data update at 50% of waiting time
+            //     if (!hasUpdatedAt50Percent && Date.now() >= halfWayTime) {
+            //       hasUpdatedAt50Percent = true;
+            //       console.log("AUTOFILL: Reached 50% of wait time, forcing user data update");
+            //       updateAutoFillOutput("🔄 50% wait complete - checking charges via forced update");
+            //       await forceUpdateUserData();
 
-                  // Check if we now have enough charges after the update
-                  const updatedCharges = instance.charges;
-                  if (updatedCharges && updatedCharges.count >= updatedCharges.max) {
-                    console.log("AUTOFILL: Charges are now full after 50% update, breaking wait loop");
-                    updateAutoFillOutput("✅ Charges full after 50% update - proceeding immediately!");
-                    break;
-                  } else {
-                    console.log(`AUTOFILL: After 50% update - charges: ${updatedCharges?.count.toFixed(3)}/${updatedCharges?.max}, continuing wait`);
-                    updateAutoFillOutput(`📊 50% update result: ${updatedCharges?.count.toFixed(3)}/${updatedCharges?.max} charges, continuing wait`);
-                  }
-                }
+            //       // Check if we now have enough charges after the update
+            //       const updatedCharges = instance.charges;
+            //       if (updatedCharges && updatedCharges.count >= updatedCharges.max) {
+            //         console.log("AUTOFILL: Charges are now full after 50% update, breaking wait loop");
+            //         updateAutoFillOutput("✅ Charges full after 50% update - proceeding immediately!");
+            //         break;
+            //       } else {
+            //         console.log(`AUTOFILL: After 50% update - charges: ${updatedCharges?.count.toFixed(3)}/${updatedCharges?.max}, continuing wait`);
+            //         updateAutoFillOutput(`📊 50% update result: ${updatedCharges?.count.toFixed(3)}/${updatedCharges?.max} charges, continuing wait`);
+            //       }
+            //     }
 
-                const remainingTime = formatTime(remaining / 1000);
-                updateAutoFillOutput(`⏳ Charging ${remainingTime} remaining`);
+            //     const remainingTime = formatTime(remaining / 1000);
+            //     updateAutoFillOutput(`⏳ Charging ${remainingTime} remaining`);
 
-                // Sleep for 1 second or until the end time, whichever is shorter
-                await sleep(Math.min(1000, remaining));
-              }
+            //     // Sleep for 1 second or until the end time, whichever is shorter
+            //     await sleep(Math.min(1000, remaining));
+            //   }
 
-              if (!isRunning) {
-                console.log("AUTOFILL: Stopped during charge wait");
-                break; // Exit if stopped during wait
-              }
-              console.log("AUTOFILL: Charge wait completed, continuing");
-              continue;
-            }
+            //   if (!isRunning) {
+            //     console.log("AUTOFILL: Stopped during charge wait");
+            //     break; // Exit if stopped during wait
+            //   }
+            //   console.log("AUTOFILL: Charge wait completed, continuing");
+            //   continue;
+            // }
 
             console.log("AUTOFILL: Charges are full, proceeding with pixel placement");
             // Get owned colors before finding pixels
