@@ -499,12 +499,16 @@ function buildOverlayMain() {
         // Enable auto-fill button when templates are enabled
         const autoFillBtn = document.querySelector('#bm-button-autofill');
         const modeBtn = document.querySelector('#bm-button-mode');
+        const protectBtn = document.querySelector('#bm-button-protect');
         if (instance.apiManager?.templateManager?.templatesArray.length && instance.apiManager?.templateManager?.templatesShouldBeDrawn) {
           if (autoFillBtn) {
             autoFillBtn.disabled = false;
           }
           if (modeBtn) {
             modeBtn.disabled = false;
+          }
+          if (protectBtn) {
+            protectBtn.disabled = false;
           }
 
         }
@@ -538,11 +542,15 @@ function buildOverlayMain() {
         // Disable auto-fill button when templates are disabled
         const autoFillBtn = document.querySelector('#bm-button-autofill');
         const modeBtn = document.querySelector('#bm-button-mode');
+        const protectBtn = document.querySelector('#bm-button-protect');
         if (autoFillBtn) {
           autoFillBtn.disabled = true;
         }
         if (modeBtn) {
           modeBtn.disabled = true;
+        }
+        if (protectBtn) {
+          protectBtn.disabled = true;
         }
       }
     }).buildElement()
@@ -1185,6 +1193,62 @@ function buildOverlayMain() {
               button.textContent = 'Auto Fill';
               updateAutoFillOutput('🎉 Template completed! All owned color pixels placed.');
               updateProgressDisplay(0); // Show completion
+              
+              // Start protection mode if enabled
+              if (window.bmProtectMode) {
+                console.log("AUTOFILL: Starting protection mode - monitoring every 10s");
+                updateAutoFillOutput('🛡️ Protection mode active - monitoring template every 10s');
+                
+                const protectionInterval = setInterval(async () => {
+                  try {
+                    console.log("PROTECT: Checking template integrity...");
+                    updateAutoFillOutput('🔍 Checking template integrity...');
+                    
+                    // Get owned colors from bitmap
+                    const bitmap = instance.apiManager?.extraColorsBitmap || 0;
+                    const ownedColors = getOwnedColorsFromBitmap(bitmap);
+                    
+                    if (ownedColors.length === 0) {
+                      console.log("PROTECT: No owned colors found, skipping check");
+                      return;
+                    }
+                    
+                    // Check if there are pixels that need fixing
+                    const checkResult = await getNextPixels(0, ownedColors);
+                    
+                    if (checkResult.totalRemainingPixels > 0) {
+                      console.log(`PROTECT: Found ${checkResult.totalRemainingPixels} pixels that need protection!`);
+                      updateAutoFillOutput(`🚨 Protection alert: ${checkResult.totalRemainingPixels} pixels need fixing!`);
+                      
+                      // Check if we have charges to fix some pixels
+                      const charges = instance.apiManager?.charges;
+                      if (charges && Math.floor(charges.count) > 0) {
+                        const pixelsToFix = Math.min(Math.floor(charges.count), checkResult.totalRemainingPixels);
+                        console.log(`PROTECT: Attempting to fix ${pixelsToFix} pixels with ${Math.floor(charges.count)} charges`);
+                        updateAutoFillOutput(`🔧 Fixing ${pixelsToFix} pixels with available charges...`);
+                        
+                        // Restart auto-fill by clicking the button
+                        clearInterval(protectionInterval);
+                        updateAutoFillOutput('🛡️ Protection mode: Restarting auto-fill to fix damaged pixels');
+                        button.click(); // This will restart the auto-fill
+                      } else {
+                        console.log("PROTECT: No charges available for immediate fixing");
+                        updateAutoFillOutput('⚠️ Damage detected but no charges available for fixing');
+                      }
+                    } else {
+                      console.log("PROTECT: Template is intact");
+                      updateAutoFillOutput('✅ Template protection check: All pixels intact');
+                    }
+                  } catch (error) {
+                    console.error('PROTECT: Error during protection check:', error);
+                    updateAutoFillOutput(`❌ Protection error: ${error.message}`);
+                  }
+                }, 10000); // Check every 10 seconds
+                
+                // Store interval globally so it can be stopped if protect mode is disabled
+                window.bmProtectionInterval = protectionInterval;
+              }
+              
               break;
             }
 
@@ -1391,7 +1455,7 @@ function buildOverlayMain() {
 
             console.log("AUTOFILL: Waiting before next cycle");
             // Wait a short moment before the next cycle
-            await sleep(1000);
+            await sleep(10000);
 
           } catch (error) {
             console.error('AUTOFILL: Error during auto fill cycle:', error);
@@ -1408,6 +1472,25 @@ function buildOverlayMain() {
       button.onclick = () => {
         currentModeIndex = (currentModeIndex + 1) % modes.length;
         button.textContent = `Mode: ${modes[currentModeIndex]}`;
+      };
+    }).buildElement()
+    .addButton({ 'id': 'bm-button-protect', 'textContent': 'Protect: Off', 'disabled': true }, (instance, button) => {
+      let isProtectModeOn = false;
+
+      button.onclick = () => {
+        isProtectModeOn = !isProtectModeOn;
+        button.textContent = `Protect: ${isProtectModeOn ? 'On' : 'Off'}`;
+        instance.handleDisplayStatus(`🛡️ Protection mode ${isProtectModeOn ? 'enabled' : 'disabled'}`);
+        
+        // Store the protect mode state globally so auto-fill can access it
+        window.bmProtectMode = isProtectModeOn;
+        
+        // Clear any existing protection interval when disabling
+        if (!isProtectModeOn && window.bmProtectionInterval) {
+          clearInterval(window.bmProtectionInterval);
+          window.bmProtectionInterval = null;
+          instance.handleDisplayStatus('🛡️ Protection monitoring stopped');
+        }
       };
     }).buildElement()
     .buildElement()
@@ -1432,13 +1515,16 @@ function buildOverlayMain() {
   setTimeout(() => {
     const autoFillBtn = document.querySelector('#bm-button-autofill');
     const modeBtn = document.querySelector('#bm-button-mode');
+    const protectBtn = document.querySelector('#bm-button-protect');
     if (autoFillBtn) {
       if (overlayMain.apiManager?.templateManager?.templatesArray.length && overlayMain.apiManager?.templateManager?.templatesShouldBeDrawn) {
         autoFillBtn.disabled = false;
         modeBtn.disabled = false;
+        if (protectBtn) protectBtn.disabled = false;
       } else {
         autoFillBtn.disabled = true;
         modeBtn.disabled = true;
+        if (protectBtn) protectBtn.disabled = true;
       }
     }
   }, 0)
