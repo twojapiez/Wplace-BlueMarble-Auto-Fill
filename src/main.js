@@ -1143,6 +1143,22 @@ function buildOverlayMain() {
           isRunning = false;
           button.textContent = 'Auto Fill';
           updateAutoFillOutput('⏹️ Auto-fill stopped by user');
+
+          // Also stop protection mode if it's running
+          console.log("AUTOFILL: Stopping protection mode if active");
+          if (window.bmProtectionInterval || button.textContent === 'Stop Fill') {
+            console.log("AUTOFILL: Protection mode stopped");
+            clearInterval(window.bmProtectionInterval);
+            window.bmProtectionInterval = null;
+            window.bmProtectMode = false;
+            isRunning = false;
+            const protectBtn = document.querySelector('#bm-button-protect');
+            if (protectBtn) {
+              protectBtn.textContent = 'Protect: Off';
+            }
+            updateAutoFillOutput('🛡️ Protection mode stopped by user');
+          }
+
           return;
         }
 
@@ -1189,44 +1205,43 @@ function buildOverlayMain() {
               console.log("AUTOFILL: Template completed - no more pixels to place");
               console.log("AUTOFILL: Closing Paint Menu");
               updateAutoFillOutput('🎨 Closing Paint Menu...');
-              isRunning = false;
-              button.textContent = 'Auto Fill';
               updateAutoFillOutput('🎉 Template completed! All owned color pixels placed.');
               updateProgressDisplay(0); // Show completion
-              
+
               // Start protection mode if enabled
               if (window.bmProtectMode) {
-                console.log("AUTOFILL: Starting protection mode - monitoring every 10s");
-                updateAutoFillOutput('🛡️ Protection mode active - monitoring template every 10s');
-                
+                console.log("AUTOFILL: Starting protection mode - monitoring");
+                updateAutoFillOutput('🛡️ Protection mode active - monitoring template');
+                button.textContent = 'Stop Fill'; // Keep the button as "Stop Fill" for protection mode
+
                 const protectionInterval = setInterval(async () => {
                   try {
                     console.log("PROTECT: Checking template integrity...");
                     updateAutoFillOutput('🔍 Checking template integrity...');
-                    
+
                     // Get owned colors from bitmap
                     const bitmap = instance.apiManager?.extraColorsBitmap || 0;
                     const ownedColors = getOwnedColorsFromBitmap(bitmap);
-                    
+
                     if (ownedColors.length === 0) {
                       console.log("PROTECT: No owned colors found, skipping check");
                       return;
                     }
-                    
+
                     // Check if there are pixels that need fixing
                     const checkResult = await getNextPixels(0, ownedColors);
-                    
+
                     if (checkResult.totalRemainingPixels > 0) {
                       console.log(`PROTECT: Found ${checkResult.totalRemainingPixels} pixels that need protection!`);
                       updateAutoFillOutput(`🚨 Protection alert: ${checkResult.totalRemainingPixels} pixels need fixing!`);
-                      
+
                       // Check if we have charges to fix some pixels
                       const charges = instance.apiManager?.charges;
                       if (charges && Math.floor(charges.count) > 0) {
                         const pixelsToFix = Math.min(Math.floor(charges.count), checkResult.totalRemainingPixels);
                         console.log(`PROTECT: Attempting to fix ${pixelsToFix} pixels with ${Math.floor(charges.count)} charges`);
                         updateAutoFillOutput(`🔧 Fixing ${pixelsToFix} pixels with available charges...`);
-                        
+
                         // Restart auto-fill by clicking the button
                         clearInterval(protectionInterval);
                         updateAutoFillOutput('🛡️ Protection mode: Restarting auto-fill to fix damaged pixels');
@@ -1244,11 +1259,15 @@ function buildOverlayMain() {
                     updateAutoFillOutput(`❌ Protection error: ${error.message}`);
                   }
                 }, 10000); // Check every 10 seconds
-                
+
                 // Store interval globally so it can be stopped if protect mode is disabled
                 window.bmProtectionInterval = protectionInterval;
+              } else {
+                // If protection mode is not enabled, reset button text to "Auto Fill"
+                button.textContent = 'Auto Fill';
+                isRunning = false;
               }
-              
+
               break;
             }
 
@@ -1361,7 +1380,11 @@ function buildOverlayMain() {
                 closeButton.click();
               }
               isRunning = false;
-              button.textContent = 'Auto Fill';
+              if (window.bmProtectMode) {
+                button.textContent = 'Stop Fill'; // Keep as "Stop Fill" for protection mode
+              } else {
+                button.textContent = 'Auto Fill';
+              }
               updateAutoFillOutput('🎉 Template completed! All owned color pixels placed.');
               updateProgressDisplay(0); // Show completion
               break;
@@ -1481,15 +1504,24 @@ function buildOverlayMain() {
         isProtectModeOn = !isProtectModeOn;
         button.textContent = `Protect: ${isProtectModeOn ? 'On' : 'Off'}`;
         instance.handleDisplayStatus(`🛡️ Protection mode ${isProtectModeOn ? 'enabled' : 'disabled'}`);
-        
+
         // Store the protect mode state globally so auto-fill can access it
         window.bmProtectMode = isProtectModeOn;
-        
+
         // Clear any existing protection interval when disabling
         if (!isProtectModeOn && window.bmProtectionInterval) {
           clearInterval(window.bmProtectionInterval);
           window.bmProtectionInterval = null;
           instance.handleDisplayStatus('🛡️ Protection monitoring stopped');
+        }
+
+        // When turning protection off, check if auto-fill button says "Stop Fill" and reset it
+        if (!isProtectModeOn) {
+          const autoFillBtn = document.querySelector('#bm-button-autofill');
+          if (autoFillBtn && autoFillBtn.textContent === 'Stop Fill') {
+            autoFillBtn.click()
+            instance.handleDisplayStatus('🔄 Auto-fill button reset');
+          }
         }
       };
     }).buildElement()
