@@ -658,222 +658,85 @@ function buildOverlayMain() {
         }
       };
 
-      // Helper function to find elements in shadow DOM
-      function findInAllShadowRoots(selector) {
-        const results = [];
+      // Helper function to wait for an element to be available and optionally enabled
+      const waitForElement = async (selector, options = {}) => {
+        const {
+          maxWaitTime = 100, // Maximum wait time in seconds
+          checkEnabled = false, // Whether to check if element is enabled
+          sleepInterval = 200, // How long to wait between checks (ms)
+          logPrefix = 'AUTOFILL', // Prefix for console logs
+          description = 'element', // Description for user feedback
+          contextInfo = '' // Additional context info for messages
+        } = options;
 
-        // Check regular DOM first
-        results.push(...document.querySelectorAll(selector));
-
-        // Recursively check all shadow roots
-        function checkShadowRoots(root) {
-          const allElements = root.querySelectorAll('*');
-
-          allElements.forEach(element => {
-            if (element.shadowRoot) {
-              // Check inside this shadow root
-              results.push(...element.shadowRoot.querySelectorAll(selector));
-              // Recursively check nested shadow roots
-              checkShadowRoots(element.shadowRoot);
-            }
-          });
-        }
-
-        checkShadowRoots(document);
-        return results;
-      }
-
-      // Helper function to check for captcha and wait infinitely until cleared
-      const checkAndWaitForCaptcha = async () => {
+        let element = document.querySelector(selector);
         let waitCount = 0;
 
-        while (true) {
-          // Check for Cloudflare captcha in shadow DOM
-          const shadowCaptchaElements = findInAllShadowRoots('.cf-turnstile, .cf-challenge, .cloudflare-captcha, .captcha-container, .captcha-modal, .captcha-overlay, [data-captcha], cf-chl-widget-eru7g');
+        console.log(`${logPrefix}: Looking for ${description}${contextInfo}...`);
+        updateAutoFillOutput(`🔍 Looking for ${description}${contextInfo}...`);
 
-          // Check for iframes with Cloudflare challenge URLs
-          const iframes = document.querySelectorAll('iframe');
-          const cloudflareIframes = [];
-          iframes.forEach(iframe => {
-            const src = iframe.src || '';
-            if (src.includes('challenges.cloudflare.com') ||
-              src.includes('cdn-cgi/challenge-platform') ||
-              src.includes('turnstile')) {
-              cloudflareIframes.push(iframe);
-            }
-          });
-
-          // Check if any captcha is present and visible
-          let captchaVisible = false;
-
-          // Check shadow DOM captchas
-          shadowCaptchaElements.forEach(element => {
-            if (element && element.style.display !== 'none' && element.offsetParent !== null) {
-              captchaVisible = true;
-            }
-          });
-
-          // Check iframe captchas
-          cloudflareIframes.forEach(iframe => {
-            if (iframe && iframe.style.display !== 'none' && iframe.offsetParent !== null) {
-              captchaVisible = true;
-            }
-          });
-
-          if (!captchaVisible) {
-            // No captcha present or all captchas are hidden
-            if (waitCount > 0) {
-              updateAutoFillOutput('✅ Captcha cleared! Continuing...');
-            }
-            return true;
-          }
-
-          // Captcha is present and visible
+        // Wait until the element is available and optionally enabled
+        while ((!element || (checkEnabled && element.disabled)) && waitCount < maxWaitTime) {
           waitCount++;
-          const waitTime = waitCount * 30; // Total wait time in seconds
-          updateAutoFillOutput(`🔒 Cloudflare captcha detected (shadow DOM or iframe)! Waiting (${waitTime}s total)... Please solve the captcha.`);
-          console.log(`Cloudflare captcha detected (shadow DOM or iframe), waiting attempt ${waitCount} (${waitTime}s total)...`);
+          const waitMessage = `${logPrefix}: Waiting for ${description} to be ready${contextInfo}... (${waitCount}s/${maxWaitTime}s)`;
+          console.log(waitMessage);
+          updateAutoFillOutput(`⏳ Waiting for ${description} to be ready${contextInfo}... (${waitCount}s/${maxWaitTime}s)`);
+          await sleep(sleepInterval);
 
-          // Wait 30 seconds before checking again
-          await new Promise(resolve => setTimeout(resolve, 30000));
+          // Re-query the element in case the DOM changed
+          element = document.querySelector(selector);
         }
+
+        // Check for failure conditions
+        if (!element) {
+          const errorMessage = `❌ ${description} not found after waiting${contextInfo}`;
+          updateAutoFillOutput(errorMessage);
+          console.error(`${logPrefix}: ${description} not found after waiting${contextInfo}`);
+          return { success: false, element: null, reason: 'not_found' };
+        }
+
+        if (checkEnabled && element.disabled) {
+          const errorMessage = `❌ ${description} still disabled after waiting${contextInfo}`;
+          updateAutoFillOutput(errorMessage);
+          console.error(`${logPrefix}: ${description} still disabled after waiting${contextInfo}`);
+          return { success: false, element, reason: 'disabled' };
+        }
+
+        // Success
+        const successMessage = `✅ ${description} is ready${contextInfo}`;
+        updateAutoFillOutput(successMessage);
+        console.log(`${logPrefix}: ${description} is ready${contextInfo}`);
+        return { success: true, element, reason: 'ready' };
       };
 
+      /**
+     * Decodes the extraColorsBitmap decimal value to determine which colors are owned
+     * @param {number} extraColorsBitmap - The decimal representation from the /me endpoint
+     * @returns {number[]} Array of color IDs that are owned (includes base colors 0-31)
+     */
+      function getOwnedColorsFromBitmap(extraColorsBitmap) {
+        const ownedColors = [];
 
-      const forceUpdateUserData = async () => {
-        try {
-          updateAutoFillOutput('🔄 Force updating user data (charges, droplets)...');
-          console.log('Force updating user data via UI sequence...');
 
-          // Step 1: Click the first element
-          const firstElement = document.evaluate('/html/body/div[1]/div[1]/div[2]/div/div[1]/div/div[1]', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-          if (!firstElement) {
-            throw new Error('Could not find first element for user data update');
-          }
-          firstElement.click();
-          console.log('Clicked first element');
-          await sleep(500);
-
-          // Step 2: Click the second button
-          const secondButton = document.evaluate('/html/body/div[1]/div[1]/div[2]/div/div[1]/div/div[2]/section[1]/div[1]/button', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-          if (!secondButton) {
-            throw new Error('Could not find second button for user data update');
-          }
-          secondButton.click();
-          console.log('Clicked second button');
-          await sleep(500);
-
-          // Step 3: Click the third button
-          const thirdButton = document.evaluate('/html/body/div[1]/div[1]/div[2]/div/div[1]/dialog[1]/div/form[2]/div[2]/div/button[2]', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-          if (!thirdButton) {
-            throw new Error('Could not find third button for user data update');
-          }
-          thirdButton.click();
-          console.log('Clicked third button');
-          await sleep(1000); // Wait a bit longer for the update to process
-
-          // Step 4: Click the fourth button
-          const fourthButton = document.evaluate('/html/body/div[1]/div[1]/div[2]/div/div[1]/dialog[1]/div/form[1]/button', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-          fourthButton.click();
-          await sleep(500);
-
-          updateAutoFillOutput('✅ User data update sequence completed');
-          console.log('Force update user data sequence completed successfully');
-
-        } catch (error) {
-          console.error('Error during force user data update:', error);
-          updateAutoFillOutput(`❌ Failed to force update user data: ${error.message}`);
+        // Colors 0-31 are always available (base colors)
+        for (let i = 0; i <= 31; i++) {
+          ownedColors.push(i);
         }
-      };
 
-      async function getOwnedColors() {
-        try {
-          updateAutoFillOutput('🔍 Checking owned colors...');
+        // Check extra colors (32+) using the bitmap
+        if (extraColorsBitmap && extraColorsBitmap > 0) {
+          // Convert decimal to binary and check each bit
+          for (let colorId = 32; colorId < 64; colorId++) { // Assuming max 64 colors total
+            const bitPosition = colorId - 32; // Bit position for this color
+            const isOwned = (extraColorsBitmap & (1 << bitPosition)) !== 0;
 
-          // Step 0: Check for captcha presence before proceeding
-          const captchaCleared = await checkAndWaitForCaptcha();
-          if (!captchaCleared) {
-            return []; // Captcha blocking, cannot proceed
-          }
-
-          // Step 1: Click the paint mode button
-          const paintButton = document.querySelector('.btn.btn-primary.btn-lg.sm\\:btn-xl.relative.z-30');
-          if (!paintButton) {
-            updateAutoFillOutput('❌ Paint mode button not found');
-            console.error('Paint mode button not found');
-            return [];
-          }
-
-          paintButton.click();
-          updateAutoFillOutput('✅ Clicked paint mode button');
-          console.log('Clicked paint mode button');
-
-          // Wait for the UI to update
-          await new Promise(resolve => setTimeout(resolve, 500));
-
-          // Step 1.5: Check for expand button and click it if needed
-          const expandButton = document.querySelector('.btn.btn-lg.btn-square.sm\\:btn-xl.absolute.bottom-0.left-0.shadow-md');
-          if (expandButton) {
-            // Check if it contains the exact SVG path we're looking for
-            const svg = expandButton.querySelector('svg path[d="M480-120 300-300l58-58 122 122 122-122 58 58-180 180ZM358-598l-58-58 180-180 180 180-58 58-122-122-122 122Z"]');
-            if (svg) {
-              console.log('Found color palette expand button, clicking to expand');
-              updateAutoFillOutput('🔽 Expanding color palette...');
-              expandButton.click();
-              await new Promise(resolve => setTimeout(resolve, 500)); // Wait for expansion
+            if (isOwned) {
+              ownedColors.push(colorId);
             }
           }
-
-          // Step 2: Wait for the color palette container to appear
-          let colorPalette = document.evaluate('/html/body/div[1]/div[1]/div[8]/div/div/div[3]/div', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-
-          // Wait until the color palette is available (similar to final button waiting)
-          let waitCount = 1;
-          while (!colorPalette) {
-            console.log(`AUTOFILL: Waiting for color palette to appear... (${waitCount})`);
-            updateAutoFillOutput(`⏳ Waiting for color palette to load... (${waitCount})`);
-            await sleep(200);
-            waitCount++;
-
-            // Re-query the color palette in case the DOM changed
-            colorPalette = document.evaluate('/html/body/div[1]/div[1]/div[8]/div/div/div[3]/div', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-          }
-
-          updateAutoFillOutput('✅ Found color palette container');
-          console.log('Found color palette container');
-
-          // Step 3: Parse all color divs and identify unlocked colors
-          const ownedColorIds = [];
-          const colorDivs = colorPalette.querySelectorAll('div.tooltip');
-
-          updateAutoFillOutput(`📊 Found ${colorDivs.length} colors to check`);
-          console.log(`Found ${colorDivs.length} color divs to check`);
-
-          colorDivs.forEach((colorDiv, index) => {
-            // Get the color button inside this div
-            const colorButton = colorDiv.querySelector('button[id^="color-"]');
-            if (colorButton) {
-              const colorId = parseInt(colorButton.id.replace('color-', ''));
-
-              // Check if this color is locked by looking for SVG presence
-              // Locked colors have an SVG (lock icon), owned colors don't have an SVG
-              const hasSVG = colorButton.querySelector('svg') !== null;
-              const isLocked = hasSVG;
-
-              if (!isLocked) {
-                ownedColorIds.push(colorId);
-              }
-            }
-          });
-
-          updateAutoFillOutput(`✅ Analysis complete: ${ownedColorIds.length} owned, ${colorDivs.length - ownedColorIds.length} locked`);
-          return ownedColorIds.sort((a, b) => a - b);
-
-        } catch (error) {
-          updateAutoFillOutput(`❌ Error checking colors: ${error.message}`);
-          console.error('Error determining owned colors:', error);
-          return [];
         }
+
+        return ownedColors.sort((a, b) => a - b);
       }
 
       // Function to find closest color ID from RGB values
@@ -1225,20 +1088,26 @@ function buildOverlayMain() {
             await sleep(50);
           }
           console.log("AUTOFILL: Starting...")
-          let finalButton = document.querySelector('.btn.btn-primary.btn-lg.sm\\:btn-xl.relative');
 
-          // Wait until the final button is available and enabled
-          let waitCount = 1;
-          while (!finalButton || finalButton.disabled) {
-            console.log(`AUTOFILL: Waiting for final button to be ready... (${waitCount})`);
-            updateAutoFillOutput(`⏳ Waiting for pixel placement button to be ready... (${waitCount})`);
-            await sleep(200);
-            waitCount++;
+          // Wait for the final pixel placement button to be ready
+          const finalButtonResult = await waitForElement(
+            '.btn.btn-primary.btn-lg.sm\\:btn-xl.relative',
+            {
+              maxWaitTime: 100,
+              checkEnabled: true,
+              sleepInterval: 200,
+              logPrefix: 'AUTOFILL',
+              description: 'final pixel placement button',
+              contextInfo: ''
+            }
+          );
+
+          if (!finalButtonResult.success) {
+            throw new Error(`Could not find or enable final paint button: ${finalButtonResult.reason}`);
           }
 
-          if (!finalButton) throw new Error("Could not find the final paint button.");
           console.log("AUTOFILL: Final button is ready - clicking now");
-          finalButton.click();
+          finalButtonResult.element.click();
         };
 
         try {
@@ -1275,6 +1144,18 @@ function buildOverlayMain() {
           return;
         }
 
+        // Fetch user data from /me endpoint to ensure we have fresh data
+        try {
+          const userData = await instance.apiManager.fetchUserData();
+          if (userData) {
+            console.log('Fetched fresh user data for auto-fill');
+          } else {
+            console.warn('Failed to fetch fresh user data, continuing with cached data');
+          }
+        } catch (error) {
+          console.error('Error fetching fresh user data:', error);
+        }
+
         console.log("AUTOFILL: Starting auto fill process");
         isRunning = true;
         button.textContent = 'Stop Fill';
@@ -1291,17 +1172,36 @@ function buildOverlayMain() {
               continue;
             }
 
-            console.log(`AUTOFILL: Current charges: ${charges.count}/${charges.max}`);
-            if (charges.count < charges.max) {
-              console.log("AUTOFILL: Charges not full, forcing user data update");
-              // Force update user data to get latest charge information
-              await forceUpdateUserData();
+            const progressResult = await getNextPixels(1, getOwnedColorsFromBitmap(instance.apiManager?.extraColorsBitmap || 0)); // Pass 0 to get total count without processing pixels
 
-              // Re-check charges after force update
+            console.log(`AUTOFILL: Progress result: ${JSON.stringify(progressResult)}`);
+
+            console.log(`AUTOFILL: Found ${progressResult.totalRemainingPixels} chunk groups to process`);
+            if (progressResult.totalRemainingPixels === 0) {
+              console.log("AUTOFILL: Template completed - no more pixels to place");
+              console.log("AUTOFILL: Closing Paint Menu");
+              updateAutoFillOutput('🎨 Closing Paint Menu...');
+              isRunning = false;
+              button.textContent = 'Auto Fill';
+              updateAutoFillOutput('🎉 Template completed! All owned color pixels placed.');
+              updateProgressDisplay(0); // Show completion
+              break;
+            }
+
+            updateProgressDisplay(progressResult.totalRemainingPixels);
+
+            console.log(`AUTOFILL: Current charges: ${charges.count}/${charges.max}`);
+            if (charges.count < charges.max && progressResult.totalRemainingPixels > Math.floor(charges.count)) {
+              console.log(`AUTOFILL: Charges not full (${charges.count}/${charges.max}) and remaining pixels (${progressResult.totalRemainingPixels}) > available charges (${Math.floor(charges.count)}), refreshing user data`);
+              // Refresh user data to get latest charge information
+              updateAutoFillOutput('🔄 Refreshing user data for latest charges...');
+              await instance.apiManager.fetchUserData();
+
+              // Re-check charges after refresh
               const updatedCharges = instance.apiManager?.charges;
               if (updatedCharges && updatedCharges.count >= updatedCharges.max) {
-                console.log("AUTOFILL: Charges are now full after update, proceeding");
-                updateAutoFillOutput('✅ Charges are now full after update!');
+                console.log("AUTOFILL: Charges are now full after refresh, proceeding");
+                updateAutoFillOutput('✅ Charges are now full after refresh!');
                 continue; // Skip waiting and proceed with pixel placement
               }
 
@@ -1320,31 +1220,30 @@ function buildOverlayMain() {
               console.log(`AUTOFILL: Waiting ${(totalWaitTime / 1000).toFixed(1)}s for ${chargesNeeded} charges`);
               updateAutoFillOutput(`⏱️ Precise timing: ${charges.count.toFixed(3)}/${charges.max} charges, waiting ${formatTime(totalWaitTime / 1000)}`);
 
-              // Wait with progress updates every 5 seconds
+              // Wait with progress updates every second and user data refresh every 10 seconds
               const startTime = Date.now();
               const endTime = startTime + totalWaitTime;
-              const halfWayTime = startTime + (totalWaitTime / 2);
-              let hasUpdatedAt50Percent = false;
+              let iterationCount = 0;
 
               while (Date.now() < endTime && isRunning) {
                 const remaining = Math.max(0, endTime - Date.now());
+                iterationCount++;
 
-                // Force user data update at 50% of waiting time
-                if (!hasUpdatedAt50Percent && Date.now() >= halfWayTime) {
-                  hasUpdatedAt50Percent = true;
-                  console.log("AUTOFILL: Reached 50% of wait time, forcing user data update");
-                  updateAutoFillOutput("🔄 50% wait complete - checking charges via forced update");
-                  await forceUpdateUserData();
+                // Refresh user data every 10 seconds (10 iterations)
+                if (iterationCount % 10 === 0) {
+                  console.log(`AUTOFILL: 10 seconds elapsed (iteration ${iterationCount}), refreshing user data`);
+                  updateAutoFillOutput(`🔄 ${iterationCount}s elapsed - checking charges via data refresh`);
+                  await instance.apiManager.fetchUserData();
 
-                  // Check if we now have enough charges after the update
-                  const updatedCharges = instance.charges;
+                  // Check if we now have enough charges after the refresh
+                  const updatedCharges = instance.apiManager?.charges;
                   if (updatedCharges && updatedCharges.count >= updatedCharges.max) {
-                    console.log("AUTOFILL: Charges are now full after 50% update, breaking wait loop");
-                    updateAutoFillOutput("✅ Charges full after 50% update - proceeding immediately!");
+                    console.log("AUTOFILL: Charges are now full after refresh, breaking wait loop");
+                    updateAutoFillOutput("✅ Charges full after refresh - proceeding immediately!");
                     break;
                   } else {
-                    console.log(`AUTOFILL: After 50% update - charges: ${updatedCharges?.count.toFixed(3)}/${updatedCharges?.max}, continuing wait`);
-                    updateAutoFillOutput(`📊 50% update result: ${updatedCharges?.count.toFixed(3)}/${updatedCharges?.max} charges, continuing wait`);
+                    console.log(`AUTOFILL: After refresh - charges: ${updatedCharges?.count.toFixed(3)}/${updatedCharges?.max}, continuing wait`);
+                    updateAutoFillOutput(`📊 Refresh result: ${updatedCharges?.count.toFixed(3)}/${updatedCharges?.max} charges, continuing wait`);
                   }
                 }
 
@@ -1361,17 +1260,22 @@ function buildOverlayMain() {
               }
               console.log("AUTOFILL: Charge wait completed, continuing");
               continue;
+            } else if (charges.count < charges.max) {
+              // We have enough charges for the remaining pixels, no need to wait for full charges
+              console.log(`AUTOFILL: Charges not full (${charges.count}/${charges.max}) but sufficient for remaining pixels (${progressResult.totalRemainingPixels}), proceeding with pixel placement`);
+              updateAutoFillOutput(`⚡ Sufficient charges (${Math.floor(charges.count)}) for remaining pixels (${progressResult.totalRemainingPixels}), proceeding!`);
             }
 
-            console.log("AUTOFILL: Charges are full, proceeding with pixel placement");
-            // Get owned colors before finding pixels
-            console.log("AUTOFILL: Checking owned colors...");
-            updateAutoFillOutput('🔍 Checking owned colors...');
-            const ownedColors = await getOwnedColors();
-            console.log(`AUTOFILL: Found ${ownedColors.length} owned colors`);
+            console.log("AUTOFILL: Proceeding with pixel placement");
+            // Get owned colors from bitmap instead of UI scanning
+            console.log("AUTOFILL: Getting owned colors from extraColorsBitmap...");
+            updateAutoFillOutput('🔍 Getting owned colors from bitmap...');
+            const bitmap = instance.apiManager?.extraColorsBitmap || 0;
+            const ownedColors = getOwnedColorsFromBitmap(bitmap);
+            console.log(`AUTOFILL: Found ${ownedColors.length} owned colors from bitmap ${bitmap}`);
             if (ownedColors.length === 0) {
-              console.log("AUTOFILL: No owned colors found, retrying in 10s");
-              updateAutoFillOutput('❌ No owned colors found! Retrying in 10s...');
+              console.log("AUTOFILL: No owned colors found from bitmap, retrying in 10s");
+              updateAutoFillOutput('❌ No owned colors found from bitmap! Retrying in 10s...');
               await sleep(10000);
               continue;
             }
@@ -1383,7 +1287,7 @@ function buildOverlayMain() {
 
 
             console.log(`AUTOFILL: Found ${chunkGroups.length} chunk groups to process`);
-            if (chunkGroups.length === 0) {
+            if (progressResult.totalRemainingPixels === 0) {
               console.log("AUTOFILL: Template completed - no more pixels to place");
               console.log("AUTOFILL: Closing Paint Menu");
               updateAutoFillOutput('🎨 Closing Paint Menu...');
@@ -1399,11 +1303,33 @@ function buildOverlayMain() {
               break;
             }
 
+            // Step 1: Open the paint menu - wait for button to be available
+            const paintButtonResult = await waitForElement(
+              '.btn.btn-primary.btn-lg.sm\\:btn-xl.relative.z-30',
+              {
+                maxWaitTime: 100,
+                checkEnabled: true,
+                sleepInterval: 200,
+                logPrefix: 'AUTOFILL',
+                description: 'paint mode button',
+                contextInfo: ''
+              }
+            );
+
+            if (!paintButtonResult.success) {
+              await sleep(5000);
+              continue; // Retry the cycle
+            }
+
+            paintButtonResult.element.click();
+            updateAutoFillOutput('✅ Clicked paint mode button');
+            console.log('Clicked paint mode button');
+
+            // Wait for the UI to update
+            await sleep(500);
+
             // Calculate total pixels to place in this batch
             const totalPixels = chunkGroups.reduce((sum, group) => sum + group[1].length, 0);
-
-            // Update progress display with remaining pixels
-            updateProgressDisplay(pixelResult.totalRemainingPixels - totalPixels);
 
             console.log(`AUTOFILL: Will place ${totalPixels} pixels across ${chunkGroups.length} chunks`);
             updateAutoFillOutput(`🎯 Found ${totalPixels} pixels to place in ${chunkGroups.length} chunks`);
@@ -1425,20 +1351,25 @@ function buildOverlayMain() {
                 updateAutoFillOutput(`🎨 Reopening paint menu for chunk ${chunkIndex + 1}...`);
 
                 // Wait until the paint button is available
-                let paintButton = document.querySelector('.btn.btn-primary.btn-lg.sm\\:btn-xl.relative.z-30');
-                let waitCount = 1;
+                const paintButtonResult = await waitForElement(
+                  '.btn.btn-primary.btn-lg.sm\\:btn-xl.relative.z-30',
+                  {
+                    maxWaitTime: 100,
+                    checkEnabled: false,
+                    sleepInterval: 200,
+                    logPrefix: 'AUTOFILL',
+                    description: 'paint button',
+                    contextInfo: ` for chunk ${chunkIndex + 1}`
+                  }
+                );
 
-                while (!paintButton) {
-                  console.log(`AUTOFILL: Waiting for paint button to appear for chunk ${chunkIndex + 1}... (${waitCount})`);
-                  updateAutoFillOutput(`⏳ Waiting for paint button to appear for chunk ${chunkIndex + 1}... (${waitCount})`);
-                  await sleep(200);
-                  waitCount++;
-
-                  // Re-query the paint button in case the DOM changed
-                  paintButton = document.querySelector('.btn.btn-primary.btn-lg.sm\\:btn-xl.relative.z-30');
+                if (!paintButtonResult.success) {
+                  console.error(`AUTOFILL: Could not find paint button for chunk ${chunkIndex + 1}, skipping chunk`);
+                  updateAutoFillOutput(`❌ Could not find paint button for chunk ${chunkIndex + 1}, skipping`);
+                  continue; // Skip this chunk
                 }
 
-                paintButton.click();
+                paintButtonResult.element.click();
                 updateAutoFillOutput(`✅ Paint menu reopened for chunk ${chunkIndex + 1}`);
                 await sleep(200); // Wait for the UI to update
               }

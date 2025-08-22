@@ -19,6 +19,44 @@ export default class ApiManager {
     this.templateCoordsTilePixel = []; // Contains the last "enabled" template coords
     this.droplets = 0;
     this.charges = null;
+    this.extraColorsBitmap = null;
+  }
+
+  /** Fetches fresh user data from the /me endpoint
+   * Updates the API manager properties with the latest user information
+   * @returns {Promise<Object|null>} The user data object, or null if fetch failed
+   * @since 0.66.3
+   */
+  async fetchUserData() {
+    try {
+      const response = await fetch('https://backend.wplace.live/me', { credentials: 'include' });
+      if (response.ok) {
+        const userData = await response.json();
+        console.log('ApiManager: Fetched fresh user data:', userData);
+        
+        // Update API manager properties with fresh data
+        if (userData.extraColorsBitmap !== undefined) {
+          this.extraColorsBitmap = userData.extraColorsBitmap;
+        }
+        if (userData.droplets !== undefined) {
+          this.droplets = userData.droplets;
+        }
+        if (userData.charges !== undefined) {
+          this.charges = userData.charges;
+        }
+        if (userData.id !== undefined) {
+          this.templateManager.userID = userData.id;
+        }
+        
+        return userData;
+      } else {
+        console.warn('ApiManager: Failed to fetch user data:', response.status);
+        return null;
+      }
+    } catch (error) {
+      console.error('ApiManager: Error fetching user data:', error);
+      return null;
+    }
   }
 
   /** Determines if the spontaneously recieved response is something we want.
@@ -75,6 +113,7 @@ export default class ApiManager {
           this.templateManager.userID = dataJSON['id'];
           this.droplets = dataJSON['droplets'];
           this.charges = dataJSON['charges'];
+          this.extraColorsBitmap = dataJSON['extraColorsBitmap'];
           
           overlay.updateInnerHTML('bm-user-name', `Username: <b>${escapeHTML(dataJSON['name'])}</b>`); // Updates the text content of the username field
           overlay.updateInnerHTML('bm-user-droplets', `Droplets: <b>${new Intl.NumberFormat().format(dataJSON['droplets'])}</b>`); // Updates the text content of the droplets field
