@@ -918,6 +918,23 @@ function buildOverlayMain() {
                 console.log(`AUTOFILL: Protection delay active - waiting ${protectionDelayValue * 15} seconds before repairing`);
                 this.updateUI(`⏰ Protection delay: waiting ${protectionDelayValue * 15}s before fixing...`);
                 await this.sleep(protectionDelayMs);
+                
+                // Recheck for damage after the delay - someone else might have fixed it
+                console.log("AUTOFILL: Rechecking template integrity after protection delay...");
+                this.updateUI('🔍 Rechecking template integrity after delay...');
+                const recheckResult = await getNextPixels(0, ownedColors);
+                
+                if (recheckResult.totalRemainingPixels === 0) {
+                  console.log("AUTOFILL: Template was fixed by others during delay - no repair needed");
+                  this.updateUI('✅ Template was fixed by others during delay - no action needed');
+                  return; // Exit early, no repair needed
+                } else if (recheckResult.totalRemainingPixels < damageResult.totalRemainingPixels) {
+                  console.log(`AUTOFILL: Partial repair by others during delay - ${recheckResult.totalRemainingPixels} pixels still need fixing (was ${damageResult.totalRemainingPixels})`);
+                  this.updateUI(`🔧 Partial repair by others - ${recheckResult.totalRemainingPixels} pixels still need fixing`);
+                } else {
+                  console.log(`AUTOFILL: Damage unchanged after delay - ${recheckResult.totalRemainingPixels} pixels still need fixing`);
+                  this.updateUI(`🔧 Damage confirmed after delay - ${recheckResult.totalRemainingPixels} pixels need fixing`);
+                }
               }
 
               const charges = this.instance.apiManager?.charges;
