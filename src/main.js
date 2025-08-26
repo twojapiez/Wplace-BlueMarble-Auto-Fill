@@ -574,6 +574,8 @@ function buildOverlayMain() {
           };
           this.placedPixels = new Set();
           this.protectionInterval = null;
+          this.protectionCheckInProgress = false;
+          this.protectionRepairInProgress = false;
           this.pixelPlacer = new PixelPlacer();
           this.chargeManager = new ChargeManager(instance.apiManager);
         }
@@ -664,17 +666,29 @@ function buildOverlayMain() {
 
         clearProtectionMode() {
           if (this.protectionInterval) {
+            console.log("AUTOFILL: Clearing protection interval ID:", this.protectionInterval);
             clearInterval(this.protectionInterval);
             this.protectionInterval = null;
+            this.protectionCheckInProgress = false;
+            this.protectionRepairInProgress = false;
             window.bmProtectionInterval = null;
             console.log("AUTOFILL: Protection interval cleared and stopped");
             this.updateUI('🛡️ Protection mode stopped');
+          } else {
+            console.log("AUTOFILL: No protection interval to clear");
           }
         }
 
         async runMainLoop() {
           while (this.state.isRunning) {
             try {
+              // Skip cycle if protection is actively repairing damage
+              if (this.protectionRepairInProgress) {
+                console.log("AUTOFILL: Skipping main loop cycle - protection repair in progress");
+                await this.sleep(5000); // Wait 5s before checking again
+                continue;
+              }
+
               this.state.lastCycleTime = Date.now();
               await this.executeCycle();
             } catch (error) {
@@ -800,19 +814,25 @@ function buildOverlayMain() {
           // Set up protection interval to check every 10 seconds
           this.protectionInterval = setInterval(async () => {
             try {
-              this.checkForDamage();
+              // Only run if we're still in protection mode and not already checking
+              if (this.state.mode === 'PROTECTING' && !this.protectionCheckInProgress) {
+                this.protectionCheckInProgress = true;
+                await this.checkForDamage();
+                this.protectionCheckInProgress = false;
+              }
             } catch (error) {
               console.error('AUTOFILL: Protection check error:', error);
               this.updateUI(`❌ Protection error: ${error.message}`);
+              this.protectionCheckInProgress = false;
             }
           }, 10000); // 10 seconds as requested
 
           window.bmProtectionInterval = this.protectionInterval;
-          console.log("AUTOFILL: Protection interval started - checking every 10 seconds");
+          console.log("AUTOFILL: Protection interval started - checking every 10 seconds (ID:", this.protectionInterval, ")");
         }
 
         async checkForDamage() {
-          console.log("AUTOFILL: Checking template integrity...");
+          console.log("AUTOFILL: Checking template integrity... (protection mode:", this.state.mode, ")");
           this.updateUI('🔍 Checking template integrity...');
 
           const bitmap = this.instance.apiManager?.extraColorsBitmap || 0;
@@ -836,18 +856,28 @@ function buildOverlayMain() {
               console.log(`AUTOFILL: Attempting to fix ${pixelsToFix} pixels with ${Math.floor(charges.count)} charges`);
               this.updateUI(`🔧 Fixing ${pixelsToFix} pixels with available charges...`);
 
-              // Use existing architecture - get and place pixels
-              const repairPixels = await this.getPixelsToPlace();
-              if (repairPixels.length > 0) {
-                await this.placePixels(repairPixels);
-                
-                console.log("AUTOFILL: Protection repair completed");
-                this.updateUI('✅ Protection repair completed');
-                
-                // Wait for ghost pixels to clear
-                console.log("AUTOFILL: Waiting 15s for Ghost Pixels to clear");
-                this.updateUI('⌚ Waiting 15s for Ghost Pixels to clear');
-                await this.sleep(15000);
+              // Set repair in progress flag to prevent main loop interference
+              this.protectionRepairInProgress = true;
+              console.log("AUTOFILL: Protection repair started - main loop will pause");
+
+              try {
+                // Use existing architecture - get and place pixels
+                const repairPixels = await this.getPixelsToPlace();
+                if (repairPixels.length > 0) {
+                  await this.placePixels(repairPixels);
+                  
+                  console.log("AUTOFILL: Protection repair completed");
+                  this.updateUI('✅ Protection repair completed');
+                  
+                  // Wait for ghost pixels to clear
+                  console.log("AUTOFILL: Waiting 30s for Ghost Pixels to clear");
+                  this.updateUI('⌚ Waiting 30s for Ghost Pixels to clear');
+                  await this.sleep(30000);
+                }
+              } finally {
+                // Always clear the repair flag even if errors occur
+                this.protectionRepairInProgress = false;
+                console.log("AUTOFILL: Protection repair finished - main loop can resume");
               }
             } else {
               console.log("AUTOFILL: No charges available for immediate fixing");
