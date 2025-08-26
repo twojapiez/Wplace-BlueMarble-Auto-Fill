@@ -300,6 +300,7 @@ function buildOverlayMain() {
             '#bm-contain-userinfo',              // User information section (username, droplets, level)
             '#bm-overlay hr',                    // Visual separator lines
             '#bm-contain-automation > *:not(#bm-contain-coords)', // Automation section excluding coordinates
+            '#bm-contain-protection-delay',      // Protection delay spinner
             '#bm-input-file-template',           // Template file upload interface
             '#bm-contain-buttons-action',        // Action buttons container
             `#${instance.outputStatusId}`,       // Main status log textarea for user feedback
@@ -489,6 +490,57 @@ function buildOverlayMain() {
     .addInput({ 'type': 'number', 'id': 'bm-input-ty', 'placeholder': 'Tl Y', 'min': 0, 'max': 2047, 'step': 1, 'required': true }).buildElement()
     .addInput({ 'type': 'number', 'id': 'bm-input-px', 'placeholder': 'Px X', 'min': 0, 'max': 2047, 'step': 1, 'required': true }).buildElement()
     .addInput({ 'type': 'number', 'id': 'bm-input-py', 'placeholder': 'Px Y', 'min': 0, 'max': 2047, 'step': 1, 'required': true }).buildElement()
+    .addDiv({ 'id': 'bm-contain-protection-delay', 'style': 'display: flex; align-items: center; gap: 0.5ch; margin-top: 0.5em;' })
+    .addP({ 'textContent': 'Protection Delay:', 'style': 'margin: 0; white-space: nowrap;' }).buildElement()
+    .addDiv({ 'id': 'bm-spinner-container', 'style': 'display: flex; align-items: center;' })
+    .addButton({ 'id': 'bm-button-delay-decrease', 'textContent': '−', 'style': 'width: 24px; height: 24px; padding: 0; border-radius: 4px 0 0 4px; border: 1px solid #ccc; font-size: 16px; line-height: 1; margin: 0;' }, (instance, button) => {
+      button.onclick = () => {
+        const input = document.querySelector('#bm-input-protection-delay');
+        let value = parseInt(input.value) || 0;
+        if (value > 0) {
+          value--;
+          input.value = value;
+          const secondsDisplay = document.querySelector('#bm-delay-seconds');
+          if (secondsDisplay) {
+            secondsDisplay.textContent = `(${value * 15}s)`;
+          }
+        }
+      };
+    }).buildElement()
+    .addInput({ 'type': 'number', 'id': 'bm-input-protection-delay', 'value': '0', 'min': '0', 'max': '60', 'step': '1', 'style': 'width: 50px; text-align: center; border-radius: 0; border: 1px solid #ccc; border-left: 0; border-right: 0; margin: 0; height: 24px; padding: 0;' }, (instance, input) => {
+      input.oninput = () => {
+        let value = parseInt(input.value) || 0;
+        if (value < 0) {
+          value = 0;
+          input.value = value;
+        }
+        if (value > 60) {
+          value = 60;
+          input.value = value;
+        }
+        const secondsDisplay = document.querySelector('#bm-delay-seconds');
+        if (secondsDisplay) {
+          secondsDisplay.textContent = `(${value * 15}s)`;
+        }
+      };
+    }).buildElement()
+    .addButton({ 'id': 'bm-button-delay-increase', 'textContent': '+', 'style': 'width: 24px; height: 24px; padding: 0; border-radius: 0 4px 4px 0; border: 1px solid #ccc; font-size: 16px; line-height: 1; margin: 0;' }, (instance, button) => {
+      button.onclick = () => {
+        const input = document.querySelector('#bm-input-protection-delay');
+        let value = parseInt(input.value) || 0;
+        if (value < 60) {
+          value++;
+          input.value = value;
+          const secondsDisplay = document.querySelector('#bm-delay-seconds');
+          if (secondsDisplay) {
+            secondsDisplay.textContent = `(${value * 15}s)`;
+          }
+        }
+      };
+    }).buildElement()
+    .addSmall({ 'id': 'bm-delay-seconds', 'textContent': '(0s)', 'style': 'margin-left: 0.5ch;' }).buildElement()
+    .buildElement()
+    .buildElement()
     .buildElement()
     .addInputFile({ 'id': 'bm-input-file-template', 'textContent': 'Upload Template', 'accept': 'image/png, image/jpeg, image/webp, image/bmp, image/gif' }).buildElement()
     .addDiv({ 'id': 'bm-contain-buttons-template' })
@@ -849,6 +901,17 @@ function buildOverlayMain() {
           if (damageResult.totalRemainingPixels > 0) {
             console.log(`AUTOFILL: Found ${damageResult.totalRemainingPixels} pixels that need protection!`);
             this.updateUI(`🚨 Template griefed! ${damageResult.totalRemainingPixels} pixels need fixing!`);
+
+            // Get protection delay from spinner input
+            const protectionDelayInput = document.querySelector('#bm-input-protection-delay');
+            const protectionDelayValue = parseInt(protectionDelayInput?.value || '0');
+            const protectionDelayMs = protectionDelayValue * 15000; // Multiply by 15 seconds (15000ms)
+
+            if (protectionDelayMs > 0) {
+              console.log(`AUTOFILL: Protection delay active - waiting ${protectionDelayValue * 15} seconds before repairing`);
+              this.updateUI(`⏰ Protection delay: waiting ${protectionDelayValue * 15}s before fixing...`);
+              await this.sleep(protectionDelayMs);
+            }
 
             const charges = this.instance.apiManager?.charges;
             if (charges && Math.floor(charges.count) > 0) {
