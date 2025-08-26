@@ -902,28 +902,30 @@ function buildOverlayMain() {
             console.log(`AUTOFILL: Found ${damageResult.totalRemainingPixels} pixels that need protection!`);
             this.updateUI(`🚨 Template griefed! ${damageResult.totalRemainingPixels} pixels need fixing!`);
 
-            // Get protection delay from spinner input
-            const protectionDelayInput = document.querySelector('#bm-input-protection-delay');
-            const protectionDelayValue = parseInt(protectionDelayInput?.value || '0');
-            const protectionDelayMs = protectionDelayValue * 15000; // Multiply by 15 seconds (15000ms)
+            // Set repair in progress flag IMMEDIATELY to prevent main loop interference
+            this.protectionRepairInProgress = true;
+            console.log("AUTOFILL: Protection repair process started - main loop will pause");
 
-            if (protectionDelayMs > 0) {
-              console.log(`AUTOFILL: Protection delay active - waiting ${protectionDelayValue * 15} seconds before repairing`);
-              this.updateUI(`⏰ Protection delay: waiting ${protectionDelayValue * 15}s before fixing...`);
-              await this.sleep(protectionDelayMs);
-            }
+            try {
+              // Get protection delay from spinner input
+              const protectionDelayInput = document.querySelector('#bm-input-protection-delay');
+              const protectionDelayValue = parseInt(protectionDelayInput?.value || '0');
+              const protectionDelayMs = protectionDelayValue * 15000; // Multiply by 15 seconds (15000ms)
 
-            const charges = this.instance.apiManager?.charges;
-            if (charges && Math.floor(charges.count) > 0) {
-              const pixelsToFix = Math.min(Math.floor(charges.count), damageResult.totalRemainingPixels);
-              console.log(`AUTOFILL: Attempting to fix ${pixelsToFix} pixels with ${Math.floor(charges.count)} charges`);
-              this.updateUI(`🔧 Fixing ${pixelsToFix} pixels with available charges...`);
+              console.log("AUTOFILL: Protection delay set to " + protectionDelayMs);
 
-              // Set repair in progress flag to prevent main loop interference
-              this.protectionRepairInProgress = true;
-              console.log("AUTOFILL: Protection repair started - main loop will pause");
+              if (protectionDelayMs > 0) {
+                console.log(`AUTOFILL: Protection delay active - waiting ${protectionDelayValue * 15} seconds before repairing`);
+                this.updateUI(`⏰ Protection delay: waiting ${protectionDelayValue * 15}s before fixing...`);
+                await this.sleep(protectionDelayMs);
+              }
 
-              try {
+              const charges = this.instance.apiManager?.charges;
+              if (charges && Math.floor(charges.count) > 0) {
+                const pixelsToFix = Math.min(Math.floor(charges.count), damageResult.totalRemainingPixels);
+                console.log(`AUTOFILL: Attempting to fix ${pixelsToFix} pixels with ${Math.floor(charges.count)} charges`);
+                this.updateUI(`🔧 Fixing ${pixelsToFix} pixels with available charges...`);
+
                 // Use existing architecture - get and place pixels
                 const repairPixels = await this.getPixelsToPlace();
                 if (repairPixels.length > 0) {
@@ -937,14 +939,14 @@ function buildOverlayMain() {
                   this.updateUI('⌚ Waiting 30s for Ghost Pixels to clear');
                   await this.sleep(30000);
                 }
-              } finally {
-                // Always clear the repair flag even if errors occur
-                this.protectionRepairInProgress = false;
-                console.log("AUTOFILL: Protection repair finished - main loop can resume");
+              } else {
+                console.log("AUTOFILL: No charges available for immediate fixing");
+                this.updateUI('⚠️ Grief detected but no charges available for fixing');
               }
-            } else {
-              console.log("AUTOFILL: No charges available for immediate fixing");
-              this.updateUI('⚠️ Grief detected but no charges available for fixing');
+            } finally {
+              // Always clear the repair flag even if errors occur
+              this.protectionRepairInProgress = false;
+              console.log("AUTOFILL: Protection repair finished - main loop can resume");
             }
           } else {
             console.log("AUTOFILL: Template is intact");
