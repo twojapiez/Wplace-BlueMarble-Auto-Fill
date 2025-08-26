@@ -555,9 +555,412 @@ function buildOverlayMain() {
       }
     }).buildElement()
     .addButton({ 'id': 'bm-button-autofill', 'textContent': 'Auto Fill', 'disabled': true }, (instance, button) => {
-      let isRunning = false;
-      const placedPixels = new Set();
+      // ========== CLEAN AUTO-FILL ARCHITECTURE ==========
+
+      class AutoFillManager {
+        constructor(instance, button) {
+          this.instance = instance;
+          this.button = button;
+          this.state = {
+            isRunning: false,
+            mode: 'IDLE', // 'IDLE', 'FILLING', 'PROTECTING', 'WAITING_CHARGES'
+            lastCycleTime: 0
+          };
+          this.config = {
+            maxRetries: 3,
+            chargeWaitInterval: 10000,
+            protectionCheckInterval: 10000,
+            cycleDelay: 10000
+          };
+          this.placedPixels = new Set();
+          this.protectionInterval = null;
+          this.pixelPlacer = new PixelPlacer();
+          this.chargeManager = new ChargeManager(instance.apiManager);
+        }
+
+        sleep(ms) {
+          return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        updateUI(message, buttonText = null) {
+          updateAutoFillOutput(message);
+          if (buttonText) this.button.textContent = buttonText;
+        }
+
+        showError(message) {
+          console.log(`AUTOFILL: ${message}`);
+          this.updateUI(message);
+        }
+
+        setState(mode) {
+          this.state.mode = mode;
+          console.log(`AUTOFILL: State changed to ${mode}`);
+        }
+
+        validateTemplate() {
+          return this.instance.apiManager?.templateManager?.templatesArray.length &&
+            this.instance.apiManager?.templateManager?.templatesShouldBeDrawn;
+        }
+
+        async refreshUserData() {
+          try {
+            const userData = await this.instance.apiManager.fetchUserData();
+            if (userData) {
+              console.log('AUTOFILL: Fetched fresh user data');
+            } else {
+              console.warn('AUTOFILL: Failed to fetch fresh user data, continuing with cached data');
+            }
+          } catch (error) {
+            console.error('AUTOFILL: Error fetching fresh user data:', error);
+          }
+        }
+
+        async start() {
+          if (this.state.isRunning) {
+            // If we're running (including protection mode), stop everything
+            console.log("AUTOFILL: Already running, stopping current operation");
+            return this.stop();
+          }
+
+          if (!this.validateTemplate()) {
+            return this.showError('❌ No active template available');
+          }
+
+          await this.refreshUserData();
+          this.state.isRunning = true;
+          this.setState('FILLING');
+          this.updateUI('🚀 Auto-fill started!', 'Stop Fill');
+
+          this.runMainLoop();
+        }
+
+        stop() {
+          console.log("AUTOFILL: User requested stop");
+          this.state.isRunning = false;
+          this.setState('IDLE');
+          this.clearProtectionMode();
+
+          // Clean up UI elements that might be open from protection mode
+          this.cleanupUI();
+
+          this.updateUI('⏹️ Auto-fill stopped by user', 'Auto Fill');
+        }
+
+        cleanupUI() {
+          try {
+            // Close paint menu if it's open
+            const parentDiv = document.querySelector('.relative.px-3');
+            if (parentDiv) {
+              const closeButton = parentDiv.querySelector('.btn.btn-circle.btn-sm svg path[d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"]')?.closest('button');
+              if (closeButton) {
+                console.log("AUTOFILL: Closing paint menu during cleanup");
+                closeButton.click();
+              }
+            }
+          } catch (error) {
+            console.log("AUTOFILL: Error during UI cleanup:", error);
+          }
+        }
+
+        clearProtectionMode() {
+          if (this.protectionInterval) {
+            clearInterval(this.protectionInterval);
+            this.protectionInterval = null;
+            window.bmProtectionInterval = null;
+            console.log("AUTOFILL: Protection interval cleared and stopped");
+            this.updateUI('🛡️ Protection mode stopped');
+          }
+        }
+
+        async runMainLoop() {
+          while (this.state.isRunning) {
+            try {
+              this.state.lastCycleTime = Date.now();
+              await this.executeCycle();
+            } catch (error) {
+              console.error('AUTOFILL: Cycle error:', error);
+              this.updateUI(`❌ Error: ${error.message}. Retrying in 10s...`);
+              await this.sleep(10000);
+            }
+          }
+        }
+
+        async executeCycle() {
+          console.log(`AUTOFILL: Starting cycle in ${this.state.mode} mode`);
+          const cycleResult = await this.analyzeSituation();
+
+          switch (cycleResult.action) {
+            case 'PLACE_PIXELS':
+              await this.placePixels(cycleResult.pixels);
+              break;
+            case 'WAIT_FOR_CHARGES':
+              await this.waitForCharges(cycleResult.waitTime);
+              break;
+            case 'START_PROTECTION':
+              this.startProtectionMode();
+              break;
+            case 'CONTINUE_PROTECTION':
+              await this.sleep(this.config.protectionCheckInterval);
+              break;
+            case 'COMPLETE':
+              this.complete();
+              break;
+          }
+        }
+
+        async analyzeSituation() {
+          const charges = this.instance.apiManager?.charges;
+
+          if (!charges) {
+            return { action: 'WAIT_FOR_CHARGES', waitTime: 5000 };
+          }
+
+          const pixelsToPlace = await this.getPixelsToPlace();
+
+          if (pixelsToPlace.length === 0) {
+            if (window.bmProtectMode) {
+              return this.state.mode === 'PROTECTING'
+                ? { action: 'CONTINUE_PROTECTION' }
+                : { action: 'START_PROTECTION' };
+            } else {
+              return { action: 'COMPLETE' };
+            }
+          }
+
+          if (this.chargeManager.shouldWaitForCharges(charges, pixelsToPlace.length)) {
+            const waitTime = this.chargeManager.calculateWaitTime(charges);
+            return { action: 'WAIT_FOR_CHARGES', waitTime };
+          }
+
+          return { action: 'PLACE_PIXELS', pixels: pixelsToPlace };
+        }
+
+        async getPixelsToPlace() {
+          const charges = this.instance.apiManager?.charges;
+          const bitmap = this.instance.apiManager?.extraColorsBitmap || 0;
+          const ownedColors = getOwnedColorsFromBitmap(bitmap);
+
+          if (ownedColors.length === 0) {
+            console.log("AUTOFILL: No owned colors found");
+            return [];
+          }
+
+          const pixelResult = await getNextPixels(charges?.count || 1, ownedColors);
+          updateProgressDisplay(pixelResult.totalRemainingPixels);
+
+          return pixelResult.chunkGroups || [];
+        }
+
+        async placePixels(chunkGroups) {
+          this.setState('FILLING');
+          console.log(`AUTOFILL: Placing pixels in ${chunkGroups.length} chunks`);
+          this.updateUI(`🎯 Found ${chunkGroups.reduce((sum, chunk) => sum + chunk[1].length, 0)} pixels to place`);
+
+          for (let i = 0; i < chunkGroups.length && this.state.isRunning; i++) {
+            await this.pixelPlacer.placeChunk(chunkGroups[i], i > 0);
+          }
+
+          this.updateUI('✅ Pixel placement completed');
+          await this.sleep(this.config.cycleDelay);
+        }
+
+        async waitForCharges(waitTime) {
+          this.setState('WAITING_CHARGES');
+          const charges = this.instance.apiManager?.charges;
+          console.log(`AUTOFILL: Waiting ${(waitTime / 1000).toFixed(1)}s for charges (${charges?.count?.toFixed(2)}/${charges?.max})`);
+          this.updateUI(`⏱️ Waiting ${this.formatTime(waitTime / 1000)} for charges`);
+
+          const endTime = Date.now() + waitTime;
+          let iterations = 0;
+
+          while (Date.now() < endTime && this.state.isRunning) {
+            iterations++;
+            if (iterations % 10 === 0) {
+              await this.refreshUserData();
+              const newCharges = this.instance.apiManager?.charges;
+              if (newCharges && newCharges.count >= newCharges.max) {
+                console.log("AUTOFILL: Charges full after refresh, proceeding");
+                this.updateUI('✅ Charges full - proceeding!');
+                return;
+              }
+            }
+
+            const remaining = Math.max(0, endTime - Date.now());
+            this.updateUI(`⏳ Charging ${this.formatTime(remaining / 1000)} remaining`);
+            await this.sleep(Math.min(1000, remaining));
+          }
+        }
+
+        startProtectionMode() {
+          if (this.state.mode === 'PROTECTING') return;
+
+          this.setState('PROTECTING');
+          this.updateUI('🛡️ Protection mode active - monitoring template', 'Stop Fill');
+
+          // Set up protection interval to check every 10 seconds
+          this.protectionInterval = setInterval(async () => {
+            try {
+              this.checkForDamage();
+            } catch (error) {
+              console.error('AUTOFILL: Protection check error:', error);
+              this.updateUI(`❌ Protection error: ${error.message}`);
+            }
+          }, 10000); // 10 seconds as requested
+
+          window.bmProtectionInterval = this.protectionInterval;
+          console.log("AUTOFILL: Protection interval started - checking every 10 seconds");
+        }
+
+        async checkForDamage() {
+          console.log("AUTOFILL: Checking template integrity...");
+          this.updateUI('🔍 Checking template integrity...');
+
+          const bitmap = this.instance.apiManager?.extraColorsBitmap || 0;
+          const ownedColors = getOwnedColorsFromBitmap(bitmap);
+
+          if (ownedColors.length === 0) {
+            console.log("AUTOFILL: No owned colors for protection check");
+            this.updateUI('⚠️ No owned colors found for protection check');
+            return;
+          }
+
+          // Check for damaged/griefed pixels by getting all pixels that need to be placed
+          const damageResult = await getNextPixels(0, ownedColors);
+          if (damageResult.totalRemainingPixels > 0) {
+            console.log(`AUTOFILL: Found ${damageResult.totalRemainingPixels} pixels that need protection!`);
+            this.updateUI(`🚨 Template griefed! ${damageResult.totalRemainingPixels} pixels need fixing!`);
+
+            const charges = this.instance.apiManager?.charges;
+            if (charges && Math.floor(charges.count) > 0) {
+              const pixelsToFix = Math.min(Math.floor(charges.count), damageResult.totalRemainingPixels);
+              console.log(`AUTOFILL: Attempting to fix ${pixelsToFix} pixels with ${Math.floor(charges.count)} charges`);
+              this.updateUI(`🔧 Fixing ${pixelsToFix} pixels with available charges...`);
+
+              // Use existing architecture - get and place pixels
+              const repairPixels = await this.getPixelsToPlace();
+              if (repairPixels.length > 0) {
+                await this.placePixels(repairPixels);
+                
+                console.log("AUTOFILL: Protection repair completed");
+                this.updateUI('✅ Protection repair completed');
+                
+                // Wait for ghost pixels to clear
+                console.log("AUTOFILL: Waiting 15s for Ghost Pixels to clear");
+                this.updateUI('⌚ Waiting 15s for Ghost Pixels to clear');
+                await this.sleep(15000);
+              }
+            } else {
+              console.log("AUTOFILL: No charges available for immediate fixing");
+              this.updateUI('⚠️ Grief detected but no charges available for fixing');
+            }
+          } else {
+            console.log("AUTOFILL: Template is intact");
+            this.updateUI('✅ Template protection check: All pixels intact');
+          }
+        }
+
+        complete() {
+          console.log("AUTOFILL: Template completed - checking protection mode setting");
+          this.state.isRunning = false;
+          updateProgressDisplay(0); // Show completion
+
+          if (window.bmProtectMode) {
+            console.log("AUTOFILL: Protection mode enabled - starting protection monitoring");
+            this.updateUI('🎉 Template completed! Starting protection mode...');
+            this.startProtectionMode();
+          } else {
+            console.log("AUTOFILL: Protection mode disabled - stopping completely");
+            this.setState('IDLE');
+            this.updateUI('🎉 Template completed! All owned color pixels placed.', 'Auto Fill');
+          }
+        }
+
+        formatTime(seconds) {
+          const h = Math.floor(seconds / 3600);
+          const m = Math.floor((seconds % 3600) / 60);
+          const s = Math.floor(seconds % 60);
+          return h > 0 ? `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+            : `${m}:${s.toString().padStart(2, '0')}`;
+        }
+      }
+
+      class PixelPlacer {
+        constructor() {
+          this.retryCount = 0;
+          this.maxRetries = 3;
+        }
+
+        async placeChunk(chunkGroup, needsReopenMenu = false) {
+          const [chunkCoords, pixels] = chunkGroup;
+          const [chunkX, chunkY] = chunkCoords;
+
+          console.log(`AUTOFILL: Processing chunk ${chunkX},${chunkY} with ${pixels.length} pixels`);
+
+          if (needsReopenMenu) {
+            await this.reopenPaintMenu();
+          } else {
+            await this.openPaintMenu();
+          }
+
+          await this.executePixelPlacement(chunkCoords, pixels);
+        }
+
+        async openPaintMenu() {
+          const paintButtonResult = await waitForElement(
+            '.btn.btn-primary.btn-lg.sm\\:btn-xl.relative.z-30',
+            { maxWaitTime: 100, checkEnabled: true, sleepInterval: 200, logPrefix: 'AUTOFILL' }
+          );
+
+          if (!paintButtonResult.success) {
+            throw new Error(`Could not find paint button: ${paintButtonResult.reason}`);
+          }
+
+          paintButtonResult.element.click();
+          console.log("AUTOFILL: Paint menu opened");
+        }
+
+        async reopenPaintMenu() {
+          console.log("AUTOFILL: Reopening paint menu for next chunk");
+          await this.openPaintMenu();
+        }
+
+        async executePixelPlacement(chunkCoords, pixels) {
+          const result = await placePixelsWithInterceptor(chunkCoords, pixels, 0);
+          console.log("AUTOFILL: Pixel placement completed");
+
+          // Mark pixels as placed
+          pixels.forEach(([x, y]) => {
+            const key = `${chunkCoords[0]},${chunkCoords[1]},${x},${y}`;
+            // Could track placed pixels if needed
+          });
+        }
+      }
+
+      class ChargeManager {
+        constructor(apiManager) {
+          this.apiManager = apiManager;
+        }
+
+        shouldWaitForCharges(charges, pixelsNeeded) {
+          return charges.count < charges.max &&
+            pixelsNeeded > Math.floor(charges.count);
+        }
+
+        calculateWaitTime(charges) {
+          const chargesNeeded = charges.max - Math.floor(charges.count);
+          const partialCharge = charges.count - Math.floor(charges.count);
+          const chargeRate = charges.rechargeTime || 30000; // 30s default
+
+          const timeForCurrentCharge = Math.ceil((1 - partialCharge) * chargeRate);
+          const timeForRemainingCharges = (chargesNeeded - 1) * chargeRate;
+
+          return timeForCurrentCharge + timeForRemainingCharges;
+        }
+      }
+
+      // ========== UTILITY FUNCTIONS ==========
       const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+      const placedPixels = new Set();
       const colorMap = {
         0: [0, 0, 0, 0],        // Transparent
         1: [0, 0, 0, 255],      // Black
@@ -770,13 +1173,13 @@ function buildOverlayMain() {
         try {
           const response = await fetch(`https://backend.wplace.live/files/s0/tiles/${chunkX}/${chunkY}.png`);
           if (!response.ok) {
-            console.log(`Chunk ${chunkX},${chunkY} not found or empty`);
+            console.log(`AUTOFILL: Chunk ${chunkX},${chunkY} not found or empty`);
             return null;
           }
           const blob = await response.blob();
           return await createImageBitmap(blob);
         } catch (error) {
-          console.warn(`Failed to fetch chunk ${chunkX},${chunkY}:`, error);
+          console.warn(`AUTOFILL: Failed to fetch chunk ${chunkX},${chunkY}:`, error);
           return null;
         }
       };
@@ -816,7 +1219,7 @@ function buildOverlayMain() {
           const [chunkX, chunkY, tilePixelX, tilePixelY] = parts;
 
           // Print out the chunk and tile coordinate data
-          console.log(`Processing tile - ChunkX: ${chunkX}, ChunkY: ${chunkY}, TileCoordX: ${tilePixelX}, TileCoordY: ${tilePixelY}`);
+          console.log(`AUTOFILL: Processing tile - ChunkX: ${chunkX}, ChunkY: ${chunkY}, TileCoordX: ${tilePixelX}, TileCoordY: ${tilePixelY}`);
 
           // Fetch current chunk data if not already cached
           const chunkKey = `${chunkX},${chunkY}`;
@@ -962,16 +1365,13 @@ function buildOverlayMain() {
         const edgePixels = allPixelsToPlace.filter(pixel => isEdgePixel(pixel));
         const nonEdgePixels = allPixelsToPlace.filter(pixel => !isEdgePixel(pixel));
 
-        // Debug log to see what we're working with
-        console.log(`DEBUG: Total pixels to place: ${allPixelsToPlace.length}, Edge pixels: ${edgePixels.length}, Non-edge pixels: ${nonEdgePixels.length}`);
-
         // Sort pixels based on selected mode
         let prioritizedPixels = [];
 
         if (currentMode === 'Scan') {
           // For now, sort all pixels together in scan-line order
           prioritizedPixels = [...edgePixels, ...nonEdgePixels];
-          console.log(`📏 Scan mode: ${prioritizedPixels.length} total pixels in top-left to bottom-right scan order`);
+          console.log(`AUTOFILL: 📏 Scan mode: ${prioritizedPixels.length} total pixels in top-left to bottom-right scan order`);
         } else { // Random mode
           // Shuffle both arrays randomly
           const shuffleArray = (array) => {
@@ -984,7 +1384,7 @@ function buildOverlayMain() {
           };
 
           prioritizedPixels = [...shuffleArray(edgePixels), ...shuffleArray(nonEdgePixels)];
-          console.log(`🎲 Random mode: ${edgePixels.length} edge pixels first (randomized), then ${nonEdgePixels.length} inner pixels (randomized)`);
+          console.log(`AUTOFILL: 🎲 Random mode: ${edgePixels.length} edge pixels first (randomized), then ${nonEdgePixels.length} inner pixels (randomized)`);
         }
 
         // Group pixels by chunk and apply count limit
@@ -1004,7 +1404,7 @@ function buildOverlayMain() {
         }
 
 
-        console.log(`\n📊 SUMMARY: Found ${allPixelsToPlace.length} total pixels that need placement (filtered by ${ownedColors.length} owned colors), returning ${totalPixelsAdded} pixels (${edgePixels.length} edge priority)`);
+        console.log(`AUTOFILL: \n📊 SUMMARY: Found ${allPixelsToPlace.length} total pixels that need placement (filtered by ${ownedColors.length} owned colors), returning ${totalPixelsAdded} pixels (${edgePixels.length} edge priority)`);
 
         // Return both the chunk groups and the total remaining pixels count
         return {
@@ -1031,7 +1431,7 @@ function buildOverlayMain() {
 
             if (method === 'POST' && typeof url === 'string' && url.includes('/pixel/')) {
               try {
-                console.log(`${logPrefix}: Intercepting fetch request`);
+                console.log(`AUTOFILL: Intercepting fetch request`);
                 const originalBody = JSON.parse(options.body);
                 const token = originalBody['t'];
                 if (!token) {
@@ -1044,7 +1444,7 @@ function buildOverlayMain() {
 
                 interceptionActive = false;
                 unsafeWindow.fetch = originalFetch;
-                console.log(`${logPrefix}: Sending modified request`);
+                console.log(`AUTOFILL: Sending modified request`);
                 const result = await originalFetch.call(unsafeWindow, newUrl || url, newOptions);
                 resolve(result);
                 return result;
@@ -1123,7 +1523,7 @@ function buildOverlayMain() {
 
           // Check for rate limiting (429 status code)
           if (result.status === 429) {
-            console.log(`Rate limited (429) on chunk ${chunkX},${chunkY}. Waiting 30s before retry...`);
+            console.log(`AUTOFILL: Rate limited (429) on chunk ${chunkX},${chunkY}. Waiting 30s before retry...`);
             updateAutoFillOutput(`⏰ Rate limited! Waiting 30s before retry (attempt ${retryCount + 1})...`);
             await new Promise(resolve => setTimeout(resolve, 30000));
             updateAutoFillOutput(`🔄 Retrying pixel placement for chunk ${chunkX},${chunkY}...`);
@@ -1136,359 +1536,16 @@ function buildOverlayMain() {
         }
       };
 
+      // ========== MAIN IMPLEMENTATION ==========
+      const autoFillManager = new AutoFillManager(instance, button);
+
+      // Store reference to manager in button for other components to access
+      button.autoFillManager = autoFillManager;
 
       button.onclick = async () => {
-        if (isRunning) {
-          console.log("AUTOFILL: User requested stop");
-          isRunning = false;
-          button.textContent = 'Auto Fill';
-          updateAutoFillOutput('⏹️ Auto-fill stopped by user');
-
-          // Also stop protection mode if it's running
-          console.log("AUTOFILL: Stopping protection mode if active");
-          if (window.bmProtectionInterval || button.textContent === 'Stop Fill') {
-            console.log("AUTOFILL: Protection mode stopped");
-            clearInterval(window.bmProtectionInterval);
-            window.bmProtectionInterval = null;
-            window.bmProtectMode = false;
-            isRunning = false;
-            const protectBtn = document.querySelector('#bm-button-protect');
-            if (protectBtn) {
-              protectBtn.textContent = 'Protect: Off';
-            }
-            updateAutoFillOutput('🛡️ Protection mode stopped by user');
-          }
-
-          return;
-        }
-
-        if (!instance.apiManager?.templateManager?.templatesArray.length || !instance.apiManager?.templateManager?.templatesShouldBeDrawn) {
-          console.log("AUTOFILL: No active template available");
-          updateAutoFillOutput('❌ No active template available');
-          return;
-        }
-
-        // Fetch user data from /me endpoint to ensure we have fresh data
-        try {
-          const userData = await instance.apiManager.fetchUserData();
-          if (userData) {
-            console.log('Fetched fresh user data for auto-fill');
-          } else {
-            console.warn('Failed to fetch fresh user data, continuing with cached data');
-          }
-        } catch (error) {
-          console.error('Error fetching fresh user data:', error);
-        }
-
-        console.log("AUTOFILL: Starting auto fill process");
-        isRunning = true;
-        button.textContent = 'Stop Fill';
-        updateAutoFillOutput('🚀 Auto-fill started!');
-
-        while (isRunning) {
-          try {
-            console.log("AUTOFILL: Starting new cycle");
-            const charges = instance.apiManager?.charges;
-            if (!charges) {
-              console.log("AUTOFILL: No charge data available, waiting...");
-              updateAutoFillOutput('⏳ Waiting for charge data...');
-              await sleep(5000);
-              continue;
-            }
-
-            const progressResult = await getNextPixels(1, getOwnedColorsFromBitmap(instance.apiManager?.extraColorsBitmap || 0)); // Pass 0 to get total count without processing pixels
-
-            console.log(`AUTOFILL: Progress result: ${JSON.stringify(progressResult)}`);
-
-            console.log(`AUTOFILL: Found ${progressResult.totalRemainingPixels} chunk groups to process`);
-            if (progressResult.totalRemainingPixels === 0) {
-              console.log("AUTOFILL: Template completed - no more pixels to place");
-              console.log("AUTOFILL: Closing Paint Menu");
-              updateAutoFillOutput('🎨 Closing Paint Menu...');
-              updateAutoFillOutput('🎉 Template completed! All owned color pixels placed.');
-              updateProgressDisplay(0); // Show completion
-
-              // Start protection mode if enabled
-              if (window.bmProtectMode) {
-                console.log("AUTOFILL: Starting protection mode - monitoring");
-                updateAutoFillOutput('🛡️ Protection mode active - monitoring template');
-                button.textContent = 'Stop Fill'; // Keep the button as "Stop Fill" for protection mode
-
-                const protectionInterval = setInterval(async () => {
-                  try {
-                    console.log("PROTECT: Checking template integrity...");
-                    updateAutoFillOutput('🔍 Checking template integrity...');
-
-                    // Get owned colors from bitmap
-                    const bitmap = instance.apiManager?.extraColorsBitmap || 0;
-                    const ownedColors = getOwnedColorsFromBitmap(bitmap);
-
-                    if (ownedColors.length === 0) {
-                      console.log("PROTECT: No owned colors found, skipping check");
-                      return;
-                    }
-
-                    // Check if there are pixels that need fixing
-                    const checkResult = await getNextPixels(0, ownedColors);
-
-                    if (checkResult.totalRemainingPixels > 0) {
-                      console.log(`PROTECT: Found ${checkResult.totalRemainingPixels} pixels that need protection!`);
-                      updateAutoFillOutput(`🚨 Protection alert: ${checkResult.totalRemainingPixels} pixels need fixing!`);
-
-                      // Check if we have charges to fix some pixels
-                      const charges = instance.apiManager?.charges;
-                      if (charges && Math.floor(charges.count) > 0) {
-                        const pixelsToFix = Math.min(Math.floor(charges.count), checkResult.totalRemainingPixels);
-                        console.log(`PROTECT: Attempting to fix ${pixelsToFix} pixels with ${Math.floor(charges.count)} charges`);
-                        updateAutoFillOutput(`🔧 Fixing ${pixelsToFix} pixels with available charges...`);
-
-                        // Restart auto-fill by clicking the button
-                        clearInterval(protectionInterval);
-                        updateAutoFillOutput('🛡️ Protection mode: Restarting auto-fill to fix damaged pixels');
-                        button.click(); // This will restart the auto-fill
-                      } else {
-                        console.log("PROTECT: No charges available for immediate fixing");
-                        updateAutoFillOutput('⚠️ Damage detected but no charges available for fixing');
-                      }
-                    } else {
-                      console.log("PROTECT: Template is intact");
-                      updateAutoFillOutput('✅ Template protection check: All pixels intact');
-                    }
-                  } catch (error) {
-                    console.error('PROTECT: Error during protection check:', error);
-                    updateAutoFillOutput(`❌ Protection error: ${error.message}`);
-                  }
-                }, 10000); // Check every 10 seconds
-
-                // Store interval globally so it can be stopped if protect mode is disabled
-                window.bmProtectionInterval = protectionInterval;
-              } else {
-                // If protection mode is not enabled, reset button text to "Auto Fill"
-                button.textContent = 'Auto Fill';
-                isRunning = false;
-              }
-
-              break;
-            }
-
-            updateProgressDisplay(progressResult.totalRemainingPixels);
-
-            console.log(`AUTOFILL: Current charges: ${charges.count}/${charges.max}`);
-            if (charges.count < charges.max && progressResult.totalRemainingPixels > Math.floor(charges.count)) {
-              console.log(`AUTOFILL: Charges not full (${charges.count}/${charges.max}) and remaining pixels (${progressResult.totalRemainingPixels}) > available charges (${Math.floor(charges.count)}), refreshing user data`);
-              // Refresh user data to get latest charge information
-              updateAutoFillOutput('🔄 Refreshing user data for latest charges...');
-              await instance.apiManager.fetchUserData();
-
-              // Re-check charges after refresh
-              const updatedCharges = instance.apiManager?.charges;
-              if (updatedCharges && updatedCharges.count >= updatedCharges.max) {
-                console.log("AUTOFILL: Charges are now full after refresh, proceeding");
-                updateAutoFillOutput('✅ Charges are now full after refresh!');
-                continue; // Skip waiting and proceed with pixel placement
-              }
-
-              console.log("AUTOFILL: Still need to wait for charges, calculating wait time");
-              // Calculate exact wait time based on decimal portion and charges needed
-              const chargesNeeded = charges.max - Math.floor(charges.count);
-              const decimalPortion = charges.count - Math.floor(charges.count);
-              const cooldownMs = charges.cooldownMs || 30000;
-
-              // Calculate time until next full charge
-              const timeToNextCharge = Math.ceil((1 - decimalPortion) * cooldownMs);
-
-              // Calculate total wait time for all needed charges
-              const totalWaitTime = timeToNextCharge + ((chargesNeeded - 1) * cooldownMs);
-
-              console.log(`AUTOFILL: Waiting ${(totalWaitTime / 1000).toFixed(1)}s for ${chargesNeeded} charges`);
-              updateAutoFillOutput(`⏱️ Precise timing: ${charges.count.toFixed(3)}/${charges.max} charges, waiting ${formatTime(totalWaitTime / 1000)}`);
-
-              // Wait with progress updates every second and user data refresh every 10 seconds
-              const startTime = Date.now();
-              const endTime = startTime + totalWaitTime;
-              let iterationCount = 0;
-
-              while (Date.now() < endTime && isRunning) {
-                const remaining = Math.max(0, endTime - Date.now());
-                iterationCount++;
-
-                // Refresh user data every 10 seconds (10 iterations)
-                if (iterationCount % 10 === 0) {
-                  console.log(`AUTOFILL: 10 seconds elapsed (iteration ${iterationCount}), refreshing user data`);
-                  updateAutoFillOutput(`🔄 ${iterationCount}s elapsed - checking charges via data refresh`);
-                  await instance.apiManager.fetchUserData();
-
-                  // Check if we now have enough charges after the refresh
-                  const updatedCharges = instance.apiManager?.charges;
-                  if (updatedCharges && updatedCharges.count >= updatedCharges.max) {
-                    console.log("AUTOFILL: Charges are now full after refresh, breaking wait loop");
-                    updateAutoFillOutput("✅ Charges full after refresh - proceeding immediately!");
-                    break;
-                  } else {
-                    console.log(`AUTOFILL: After refresh - charges: ${updatedCharges?.count.toFixed(3)}/${updatedCharges?.max}, continuing wait`);
-                    updateAutoFillOutput(`📊 Refresh result: ${updatedCharges?.count.toFixed(3)}/${updatedCharges?.max} charges, continuing wait`);
-                  }
-                }
-
-                const remainingTime = formatTime(remaining / 1000);
-                updateAutoFillOutput(`⏳ Charging ${remainingTime} remaining`);
-
-                // Sleep for 1 second or until the end time, whichever is shorter
-                await sleep(Math.min(1000, remaining));
-              }
-
-              if (!isRunning) {
-                console.log("AUTOFILL: Stopped during charge wait");
-                break; // Exit if stopped during wait
-              }
-              console.log("AUTOFILL: Charge wait completed, continuing");
-              continue;
-            } else if (charges.count < charges.max) {
-              // We have enough charges for the remaining pixels, no need to wait for full charges
-              console.log(`AUTOFILL: Charges not full (${charges.count}/${charges.max}) but sufficient for remaining pixels (${progressResult.totalRemainingPixels}), proceeding with pixel placement`);
-              updateAutoFillOutput(`⚡ Sufficient charges (${Math.floor(charges.count)}) for remaining pixels (${progressResult.totalRemainingPixels}), proceeding!`);
-            }
-
-            console.log("AUTOFILL: Proceeding with pixel placement");
-            // Get owned colors from bitmap instead of UI scanning
-            console.log("AUTOFILL: Getting owned colors from extraColorsBitmap...");
-            updateAutoFillOutput('🔍 Getting owned colors from bitmap...');
-            const bitmap = instance.apiManager?.extraColorsBitmap || 0;
-            const ownedColors = getOwnedColorsFromBitmap(bitmap);
-            console.log(`AUTOFILL: Found ${ownedColors.length} owned colors from bitmap ${bitmap}`);
-            if (ownedColors.length === 0) {
-              console.log("AUTOFILL: No owned colors found from bitmap, retrying in 10s");
-              updateAutoFillOutput('❌ No owned colors found from bitmap! Retrying in 10s...');
-              await sleep(10000);
-              continue;
-            }
-
-            console.log(`AUTOFILL: Looking for up to ${charges.count} pixels to place`);
-            updateAutoFillOutput(`⚡ Charges available (${charges.count}/${charges.max}). Finding up to ${charges.count} pixels from ${ownedColors.length} owned colors...`);
-            const pixelResult = await getNextPixels(charges.count, ownedColors);
-            const chunkGroups = pixelResult.chunkGroups;
-
-
-            console.log(`AUTOFILL: Found ${chunkGroups.length} chunk groups to process`);
-            if (progressResult.totalRemainingPixels === 0) {
-              console.log("AUTOFILL: Template completed - no more pixels to place");
-              console.log("AUTOFILL: Closing Paint Menu");
-              updateAutoFillOutput('🎨 Closing Paint Menu...');
-              const parentDiv = document.querySelector('.relative.px-3');
-              const closeButton = parentDiv.querySelector('.btn.btn-circle.btn-sm svg path[d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"]')?.closest('button');
-              if (closeButton) {
-                closeButton.click();
-              }
-              isRunning = false;
-              if (window.bmProtectMode) {
-                button.textContent = 'Stop Fill'; // Keep as "Stop Fill" for protection mode
-              } else {
-                button.textContent = 'Auto Fill';
-              }
-              updateAutoFillOutput('🎉 Template completed! All owned color pixels placed.');
-              updateProgressDisplay(0); // Show completion
-              break;
-            }
-
-            // Step 1: Open the paint menu - wait for button to be available
-            const paintButtonResult = await waitForElement(
-              '.btn.btn-primary.btn-lg.sm\\:btn-xl.relative.z-30',
-              {
-                maxWaitTime: 100,
-                checkEnabled: true,
-                sleepInterval: 200,
-                logPrefix: 'AUTOFILL',
-                description: 'paint mode button',
-                contextInfo: ''
-              }
-            );
-
-            if (!paintButtonResult.success) {
-              await sleep(5000);
-              continue; // Retry the cycle
-            }
-
-            paintButtonResult.element.click();
-            updateAutoFillOutput('✅ Clicked paint mode button');
-            console.log('Clicked paint mode button');
-
-            // Wait for the UI to update
-            await sleep(500);
-
-            // Calculate total pixels to place in this batch
-            const totalPixels = chunkGroups.reduce((sum, group) => sum + group[1].length, 0);
-
-            console.log(`AUTOFILL: Will place ${totalPixels} pixels across ${chunkGroups.length} chunks`);
-            updateAutoFillOutput(`🎯 Found ${totalPixels} pixels to place in ${chunkGroups.length} chunks`);
-
-            for (let chunkIndex = 0; chunkIndex < chunkGroups.length; chunkIndex++) {
-              if (!isRunning) {
-                console.log("AUTOFILL: Stopped during chunk processing");
-                break;
-              }
-
-              const chunkGroup = chunkGroups[chunkIndex];
-              const [chunkCoords, pixels] = chunkGroup;
-              const [chunkX, chunkY] = chunkCoords;
-
-              // For chunks after the first one and before the last one, reopen the paint menu
-              console.log(`AUTOFILL: ChunkIndex: ${chunkIndex}`);
-              if (chunkIndex > 0) {
-                console.log(`AUTOFILL: Reopening paint menu for chunk ${chunkIndex + 1}/${chunkGroups.length}`);
-                updateAutoFillOutput(`🎨 Reopening paint menu for chunk ${chunkIndex + 1}...`);
-
-                // Wait until the paint button is available
-                const paintButtonResult = await waitForElement(
-                  '.btn.btn-primary.btn-lg.sm\\:btn-xl.relative.z-30',
-                  {
-                    maxWaitTime: 100,
-                    checkEnabled: false,
-                    sleepInterval: 200,
-                    logPrefix: 'AUTOFILL',
-                    description: 'paint button',
-                    contextInfo: ` for chunk ${chunkIndex + 1}`
-                  }
-                );
-
-                if (!paintButtonResult.success) {
-                  console.error(`AUTOFILL: Could not find paint button for chunk ${chunkIndex + 1}, skipping chunk`);
-                  updateAutoFillOutput(`❌ Could not find paint button for chunk ${chunkIndex + 1}, skipping`);
-                  continue; // Skip this chunk
-                }
-
-                paintButtonResult.element.click();
-                updateAutoFillOutput(`✅ Paint menu reopened for chunk ${chunkIndex + 1}`);
-                await sleep(200); // Wait for the UI to update
-              }
-
-              console.log(`AUTOFILL: Processing chunk ${chunkX},${chunkY} with ${pixels.length} pixels`);
-              updateAutoFillOutput(`🔄 Placing ${pixels.length} pixels in chunk ${chunkX},${chunkY}...`);
-              await placePixelsWithInterceptor(chunkCoords, pixels);
-              console.log("AUTOFILL: Finished Intercept")
-              pixels.forEach(([logicalX, logicalY]) => placedPixels.add(`${chunkX},${chunkY},${logicalX},${logicalY}`));
-              updateAutoFillOutput(`✅ Placed ${pixels.length} pixels in chunk (${chunkX},${chunkY})`);
-            }
-
-            console.log(`AUTOFILL: Completed placing ${totalPixels} pixels, starting UI cleanup`);
-
-            if (isRunning) {
-              console.log(`AUTOFILL: Batch completed successfully - ${totalPixels} pixels placed`);
-              updateAutoFillOutput(`🎯 Batch complete: ${totalPixels} pixels placed`);
-            }
-
-            console.log("AUTOFILL: Waiting before next cycle");
-            // Wait a short moment before the next cycle
-            await sleep(10000);
-
-          } catch (error) {
-            console.error('AUTOFILL: Error during auto fill cycle:', error);
-            updateAutoFillOutput(`❌ Error: ${error.message}. Retrying in 10s...`);
-            await sleep(10000);
-          }
-        }
+        await autoFillManager.start();
       };
-    }).buildElement()
-    .addButton({ 'id': 'bm-button-mode', 'textContent': 'Mode: Scan', 'disabled': true }, (instance, button) => {
+    }).buildElement().addButton({ 'id': 'bm-button-mode', 'textContent': 'Mode: Scan', 'disabled': true }, (instance, button) => {
       const modes = ['Scan', 'Random'];
       let currentModeIndex = 0;
 
@@ -1501,28 +1558,19 @@ function buildOverlayMain() {
       let isProtectModeOn = false;
 
       button.onclick = () => {
+        // Check if AutoFillManager is in protection mode and stop it
+        const autoFillBtn = document.querySelector('#bm-button-autofill');
+        if (autoFillBtn && autoFillBtn.autoFillManager && autoFillBtn.autoFillManager.state.mode === 'PROTECTING') {
+          console.log("AUTOFILL: Stopping active protection mode");
+          autoFillBtn.autoFillManager.stop();
+        }
+
         isProtectModeOn = !isProtectModeOn;
         button.textContent = `Protect: ${isProtectModeOn ? 'On' : 'Off'}`;
         instance.handleDisplayStatus(`🛡️ Protection mode ${isProtectModeOn ? 'enabled' : 'disabled'}`);
 
         // Store the protect mode state globally so auto-fill can access it
         window.bmProtectMode = isProtectModeOn;
-
-        // Clear any existing protection interval when disabling
-        if (!isProtectModeOn && window.bmProtectionInterval) {
-          clearInterval(window.bmProtectionInterval);
-          window.bmProtectionInterval = null;
-          instance.handleDisplayStatus('🛡️ Protection monitoring stopped');
-        }
-
-        // When turning protection off, check if auto-fill button says "Stop Fill" and reset it
-        if (!isProtectModeOn) {
-          const autoFillBtn = document.querySelector('#bm-button-autofill');
-          if (autoFillBtn && autoFillBtn.textContent === 'Stop Fill') {
-            autoFillBtn.click()
-            instance.handleDisplayStatus('🔄 Auto-fill button reset');
-          }
-        }
       };
     }).buildElement()
     .buildElement()
