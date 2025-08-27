@@ -622,7 +622,7 @@ function buildOverlayMain() {
             maxRetries: 3,
             chargeWaitInterval: 10000,
             protectionCheckInterval: 10000,
-            cycleDelay: 10000
+            cycleDelay: 20000
           };
           this.placedPixels = new Set();
           this.protectionInterval = null;
@@ -754,10 +754,12 @@ function buildOverlayMain() {
         async executeCycle() {
           console.log(`AUTOFILL: Starting cycle in ${this.state.mode} mode`);
           const cycleResult = await this.analyzeSituation();
+          
+          console.log(`D_AUTOFILL: Cycle result action: ${cycleResult.action}`);
 
           switch (cycleResult.action) {
             case 'PLACE_PIXELS':
-              await this.placePixels(cycleResult.pixels);
+              await this.placePixels(cycleResult.pixels.chunkGroups);
               break;
             case 'WAIT_FOR_CHARGES':
               await this.waitForCharges(cycleResult.waitTime);
@@ -775,6 +777,7 @@ function buildOverlayMain() {
         }
 
         async analyzeSituation() {
+          await this.refreshUserData()
           const charges = this.instance.apiManager?.charges;
 
           if (!charges) {
@@ -783,7 +786,7 @@ function buildOverlayMain() {
 
           const pixelsToPlace = await this.getPixelsToPlace();
 
-          if (pixelsToPlace.length === 0) {
+          if (pixelsToPlace.totalRemainingPixels === 0) {
             if (window.bmProtectMode) {
               return this.state.mode === 'PROTECTING'
                 ? { action: 'CONTINUE_PROTECTION' }
@@ -793,16 +796,22 @@ function buildOverlayMain() {
             }
           }
 
-          if (this.chargeManager.shouldWaitForCharges(charges, pixelsToPlace.length)) {
-            const waitTime = this.chargeManager.calculateWaitTime(charges);
+          const totalPixelCount = pixelsToPlace.totalRemainingPixels;
+          console.log(`D_AUTOFILL: Before charge check - chunks: ${pixelsToPlace.length}, totalPixels: ${totalPixelCount}, charges:`, charges);
+          
+          if (this.chargeManager.shouldWaitForCharges(charges, totalPixelCount)) {
+            const waitTime = this.chargeManager.calculateWaitTime(charges, totalPixelCount);
+            console.log(`D_AUTOFILL: Waiting for charges - waitTime: ${waitTime}ms`);
             return { action: 'WAIT_FOR_CHARGES', waitTime };
           }
 
+          console.log(`D_AUTOFILL: Proceeding to place ${totalPixelCount} pixels in ${pixelsToPlace.chunkGroups.length} chunks`);
           return { action: 'PLACE_PIXELS', pixels: pixelsToPlace };
         }
 
         async getPixelsToPlace() {
-          const charges = this.instance.apiManager?.charges;
+          await this.refreshUserData();
+          const charges = Math.floor(this.instance.apiManager?.charges?.count || 0);
           const bitmap = this.instance.apiManager?.extraColorsBitmap || 0;
           const ownedColors = getOwnedColorsFromBitmap(bitmap);
 
@@ -810,11 +819,12 @@ function buildOverlayMain() {
             console.log("AUTOFILL: No owned colors found");
             return [];
           }
-
-          const pixelResult = await getNextPixels(charges?.count || 1, ownedColors);
+          const pixelResult = await getNextPixels(charges || 1, ownedColors);
           updateProgressDisplay(pixelResult.totalRemainingPixels);
 
-          return pixelResult.chunkGroups || [];
+          console.log(`D_AUTOFILL: getPixelsToPlace - Charge Count: ${charges || 0}, Chunkgroup.length: ${pixelResult.chunkGroups?.length || 0} chunks, totalPixels: ${pixelResult.totalRemainingPixels}`);
+
+          return pixelResult;
         }
 
         async placePixels(chunkGroups) {
@@ -937,6 +947,7 @@ function buildOverlayMain() {
                 }
               }
 
+              await this.refreshUserData();
               const charges = this.instance.apiManager?.charges;
               if (charges && Math.floor(charges.count) > 0) {
                 const pixelsToFix = Math.min(Math.floor(charges.count), damageResult.totalRemainingPixels);
@@ -945,16 +956,16 @@ function buildOverlayMain() {
 
                 // Use existing architecture - get and place pixels
                 const repairPixels = await this.getPixelsToPlace();
-                if (repairPixels.length > 0) {
-                  await this.placePixels(repairPixels);
+                if (repairPixels.totalRemainingPixels > 0) {
+                  await this.placePixels(repairPixels.chunkGroups);
                   
                   console.log("AUTOFILL: Protection repair completed");
                   this.updateUI('✅ Protection repair completed');
                   
                   // Wait for ghost pixels to clear
-                  console.log("AUTOFILL: Waiting 30s for Ghost Pixels to clear");
-                  this.updateUI('⌚ Waiting 30s for Ghost Pixels to clear');
-                  await this.sleep(30000);
+                  console.log("AUTOFILL: Waiting 10s for Ghost Pixels to clear");
+                  this.updateUI('⌚ Waiting 10s for Ghost Pixels to clear');
+                  await this.sleep(10000);
                 }
               } else {
                 console.log("AUTOFILL: No charges available for immediate fixing");
@@ -1054,19 +1065,36 @@ function buildOverlayMain() {
         }
 
         shouldWaitForCharges(charges, pixelsNeeded) {
-          return charges.count < charges.max &&
-            pixelsNeeded > Math.floor(charges.count);
+          const currentCharges = Math.floor(charges.count);
+          const shouldWait = pixelsNeeded > currentCharges;
+          console.log(`D_AUTOFILL: shouldWaitForCharges - pixelsNeeded: ${pixelsNeeded}, currentCharges: ${currentCharges}, charges.count: ${charges.count}, shouldWait: ${shouldWait}`);
+          return shouldWait;
         }
 
-        calculateWaitTime(charges) {
-          const chargesNeeded = charges.max - Math.floor(charges.count);
+        calculateWaitTime(charges, pixelsNeeded) {
+          const currentCharges = Math.floor(charges.count);
+          // Cap the needed charges at max available charges
+          const targetCharges = Math.min(pixelsNeeded, charges.max);
+          const chargesNeeded = targetCharges - currentCharges;
           const partialCharge = charges.count - Math.floor(charges.count);
           const chargeRate = charges.rechargeTime || 30000; // 30s default
 
+          console.log(`D_AUTOFILL: calculateWaitTime - pixelsNeeded: ${pixelsNeeded}, targetCharges: ${targetCharges}, currentCharges: ${currentCharges}, chargesNeeded: ${chargesNeeded}`);
+
+          // If we need less than 1 additional charge, just wait for the current partial charge to complete
+          if (chargesNeeded <= 1) {
+            const timeForCurrentCharge = Math.ceil((1 - partialCharge) * chargeRate);
+            console.log(`D_AUTOFILL: calculateWaitTime - need ${chargesNeeded} more charges, waiting ${timeForCurrentCharge}ms for current charge`);
+            return timeForCurrentCharge;
+          }
+
+          // Calculate time for current charge + time for remaining full charges
           const timeForCurrentCharge = Math.ceil((1 - partialCharge) * chargeRate);
           const timeForRemainingCharges = (chargesNeeded - 1) * chargeRate;
-
-          return timeForCurrentCharge + timeForRemainingCharges;
+          const totalWaitTime = timeForCurrentCharge + timeForRemainingCharges;
+          
+          console.log(`D_AUTOFILL: calculateWaitTime - need ${chargesNeeded} more charges, waiting ${totalWaitTime}ms total`);
+          return totalWaitTime;
         }
       }
 
