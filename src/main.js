@@ -1065,6 +1065,7 @@ function buildOverlayMain() {
         }
 
         shouldWaitForCharges(charges, pixelsNeeded) {
+          if (charges.count === charges.max) return false;
           const currentCharges = Math.floor(charges.count);
           const shouldWait = pixelsNeeded > currentCharges;
           console.log(`D_AUTOFILL: shouldWaitForCharges - pixelsNeeded: ${pixelsNeeded}, currentCharges: ${currentCharges}, charges.count: ${charges.count}, shouldWait: ${shouldWait}`);
