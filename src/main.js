@@ -763,7 +763,6 @@ function buildOverlayMain() {
           console.log(`AUTOFILL: Starting cycle in ${this.state.mode} mode`);
           const cycleResult = await this.analyzeSituation();
           console.log(`D_AUTOFILL: Cycle result action: ${cycleResult.action}`);
-          return;
 
           switch (cycleResult.action) {
             case 'PLACE_PIXELS':
@@ -832,8 +831,7 @@ function buildOverlayMain() {
             console.log("AUTOFILL: No owned colors found");
             return [];
           }
-          // const pixelResult = await getNextPixels(charges || 1, ownedColors);
-          const pixelResult = await getNextPixels(6, ownedColors);
+          const pixelResult = await getNextPixels(charges || 1, ownedColors);
           updateProgressDisplay(pixelResult.totalRemainingPixels);
 
           console.log(`D_AUTOFILL: getPixelsToPlace - Charge Count: ${charges || 0}, Chunkgroup.length: ${pixelResult.chunkGroups?.length || 0} chunks, totalPixels: ${pixelResult.totalRemainingPixels}`);
