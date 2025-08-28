@@ -552,6 +552,7 @@ function buildOverlayMain() {
         const autoFillBtn = document.querySelector('#bm-button-autofill');
         const modeBtn = document.querySelector('#bm-button-mode');
         const protectBtn = document.querySelector('#bm-button-protect');
+        const waitBtn = document.querySelector('#bm-button-wait');
         if (instance.apiManager?.templateManager?.templatesArray.length && instance.apiManager?.templateManager?.templatesShouldBeDrawn) {
           if (autoFillBtn) {
             autoFillBtn.disabled = false;
@@ -561,6 +562,9 @@ function buildOverlayMain() {
           }
           if (protectBtn) {
             protectBtn.disabled = false;
+          }
+          if (waitBtn) {
+            waitBtn.disabled = false;
           }
 
         }
@@ -595,6 +599,7 @@ function buildOverlayMain() {
         const autoFillBtn = document.querySelector('#bm-button-autofill');
         const modeBtn = document.querySelector('#bm-button-mode');
         const protectBtn = document.querySelector('#bm-button-protect');
+        const waitBtn = document.querySelector('#bm-button-wait');
         if (autoFillBtn) {
           autoFillBtn.disabled = true;
         }
@@ -603,6 +608,9 @@ function buildOverlayMain() {
         }
         if (protectBtn) {
           protectBtn.disabled = true;
+        }
+        if (waitBtn) {
+          waitBtn.disabled = true;
         }
       }
     }).buildElement()
@@ -754,8 +762,8 @@ function buildOverlayMain() {
         async executeCycle() {
           console.log(`AUTOFILL: Starting cycle in ${this.state.mode} mode`);
           const cycleResult = await this.analyzeSituation();
-          
           console.log(`D_AUTOFILL: Cycle result action: ${cycleResult.action}`);
+          return;
 
           switch (cycleResult.action) {
             case 'PLACE_PIXELS':
@@ -799,10 +807,15 @@ function buildOverlayMain() {
           const totalPixelCount = pixelsToPlace.totalRemainingPixels;
           console.log(`D_AUTOFILL: Before charge check - chunks: ${pixelsToPlace.length}, totalPixels: ${totalPixelCount}, charges:`, charges);
           
-          if (this.chargeManager.shouldWaitForCharges(charges, totalPixelCount)) {
+          // Check if wait mode is enabled before waiting for charges
+          if (window.bmWaitMode && this.chargeManager.shouldWaitForCharges(charges, totalPixelCount)) {
             const waitTime = this.chargeManager.calculateWaitTime(charges, totalPixelCount);
             console.log(`D_AUTOFILL: Waiting for charges - waitTime: ${waitTime}ms`);
             return { action: 'WAIT_FOR_CHARGES', waitTime };
+          }
+
+          if (!window.bmWaitMode && this.chargeManager.shouldWaitForCharges(charges, totalPixelCount)) {
+            console.log(`D_AUTOFILL: Wait mode disabled - proceeding without waiting for charges`);
           }
 
           console.log(`D_AUTOFILL: Proceeding to place ${totalPixelCount} pixels in ${pixelsToPlace.chunkGroups.length} chunks`);
@@ -819,7 +832,8 @@ function buildOverlayMain() {
             console.log("AUTOFILL: No owned colors found");
             return [];
           }
-          const pixelResult = await getNextPixels(charges || 1, ownedColors);
+          // const pixelResult = await getNextPixels(charges || 1, ownedColors);
+          const pixelResult = await getNextPixels(6, ownedColors);
           updateProgressDisplay(pixelResult.totalRemainingPixels);
 
           console.log(`D_AUTOFILL: getPixelsToPlace - Charge Count: ${charges || 0}, Chunkgroup.length: ${pixelResult.chunkGroups?.length || 0} chunks, totalPixels: ${pixelResult.totalRemainingPixels}`);
@@ -1020,7 +1034,8 @@ function buildOverlayMain() {
           console.log(`AUTOFILL: Processing chunk ${chunkX},${chunkY} with ${pixels.length} pixels`);
 
           if (needsReopenMenu) {
-            await this.reopenPaintMenu();
+          console.log("AUTOFILL: Reopening paint menu for next chunk");
+          await this.openPaintMenu();
           } else {
             await this.openPaintMenu();
           }
@@ -1040,11 +1055,6 @@ function buildOverlayMain() {
 
           paintButtonResult.element.click();
           console.log("AUTOFILL: Paint menu opened");
-        }
-
-        async reopenPaintMenu() {
-          console.log("AUTOFILL: Reopening paint menu for next chunk");
-          await this.openPaintMenu();
         }
 
         async executePixelPlacement(chunkCoords, pixels) {
@@ -1510,9 +1520,31 @@ function buildOverlayMain() {
         let prioritizedPixels = [];
 
         if (currentMode === 'Scan') {
-          // For now, sort all pixels together in scan-line order
-          prioritizedPixels = [...edgePixels, ...nonEdgePixels];
-          console.log(`AUTOFILL: 📏 Scan mode: ${prioritizedPixels.length} total pixels in top-left to bottom-right scan order`);
+          // Sort edge pixels in scanline order, then non-edge pixels in scanline order
+          const sortedEdgePixels = edgePixels.sort((a, b) => {
+            // Calculate global coordinates for sorting (chunk size is 1000x1000)
+            const aGlobalY = (a.chunkY * 1000) + a.finalLogicalY;
+            const aGlobalX = (a.chunkX * 1000) + a.finalLogicalX;
+            const bGlobalY = (b.chunkY * 1000) + b.finalLogicalY;
+            const bGlobalX = (b.chunkX * 1000) + b.finalLogicalX;
+            
+            if (aGlobalY !== bGlobalY) return aGlobalY - bGlobalY;
+            return aGlobalX - bGlobalX;
+          });
+          const sortedNonEdgePixels = nonEdgePixels.sort((a, b) => {
+            // Calculate global coordinates for sorting (chunk size is 1000x1000)
+            const aGlobalY = (a.chunkY * 1000) + a.finalLogicalY;
+            const aGlobalX = (a.chunkX * 1000) + a.finalLogicalX;
+            const bGlobalY = (b.chunkY * 1000) + b.finalLogicalY;
+            const bGlobalX = (b.chunkX * 1000) + b.finalLogicalX;
+            
+            if (aGlobalY !== bGlobalY) return aGlobalY - bGlobalY;
+            return aGlobalX - bGlobalX;
+          });
+
+          // Edge pixels first, then non-edge pixels
+          prioritizedPixels = [...sortedEdgePixels, ...sortedNonEdgePixels];
+          console.log(`AUTOFILL: 📏 Scan mode: ${edgePixels.length} edge pixels first, then ${nonEdgePixels.length} non-edge pixels (both in scanline order)`);
         } else { // Random mode
           // Shuffle both arrays randomly
           const shuffleArray = (array) => {
@@ -1714,6 +1746,21 @@ function buildOverlayMain() {
         window.bmProtectMode = isProtectModeOn;
       };
     }).buildElement()
+    .addButton({ 'id': 'bm-button-wait', 'textContent': 'Wait: On', 'disabled': true }, (instance, button) => {
+      let isWaitModeOn = true; // Default to On
+
+      button.onclick = () => {
+        isWaitModeOn = !isWaitModeOn;
+        button.textContent = `Wait: ${isWaitModeOn ? 'On' : 'Off'}`;
+        instance.handleDisplayStatus(`⏱️ Charge waiting ${isWaitModeOn ? 'enabled' : 'disabled'}`);
+
+        // Store the wait mode state globally so auto-fill can access it
+        window.bmWaitMode = isWaitModeOn;
+      };
+
+      // Initialize the global state
+      window.bmWaitMode = true;
+    }).buildElement()
     .buildElement()
     .addTextarea({ 'id': overlayMain.outputStatusId, 'placeholder': `Status: Sleeping...\nVersion: ${version}`, 'readOnly': true }).buildElement()
     .addTextarea({ 'id': 'bm-autofill-output', 'placeholder': 'Auto-Fill Output:\nWaiting for auto-fill to start...', 'readOnly': true }).buildElement()
@@ -1737,16 +1784,17 @@ function buildOverlayMain() {
     const autoFillBtn = document.querySelector('#bm-button-autofill');
     const modeBtn = document.querySelector('#bm-button-mode');
     const protectBtn = document.querySelector('#bm-button-protect');
-    if (autoFillBtn) {
+    const waitBtn = document.querySelector('#bm-button-wait');
       if (overlayMain.apiManager?.templateManager?.templatesArray.length && overlayMain.apiManager?.templateManager?.templatesShouldBeDrawn) {
-        autoFillBtn.disabled = false;
-        modeBtn.disabled = false;
+        if (autoFillBtn) autoFillBtn.disabled = false;
+        if (modeBtn) modeBtn.disabled = false;
         if (protectBtn) protectBtn.disabled = false;
+        if (waitBtn) waitBtn.disabled = false;
       } else {
-        autoFillBtn.disabled = true;
-        modeBtn.disabled = true;
+        if (autoFillBtn) autoFillBtn.disabled = true;
+        if (modeBtn) modeBtn.disabled = true;
         if (protectBtn) protectBtn.disabled = true;
+        if (waitBtn) waitBtn.disabled = true;
       }
-    }
   }, 0)
 }
