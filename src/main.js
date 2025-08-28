@@ -1303,11 +1303,8 @@ function buildOverlayMain() {
       const getColorIdFromRGB = (r, g, b, a) => {
         if (a === 0) return 0; // Transparent
 
-        console.log(`AUTOFILL: Checking pixel color RGB(${r}, ${g}, ${b}, ${a})`);
-
         // Check for special #deface color (222, 250, 206) - place transparent pixels
         if (r === 222 && g === 250 && b === 206) {
-          console.log(`AUTOFILL: Detected #deface color at RGB(${r}, ${g}, ${b}) - placing transparent pixel`);
           return 0; // Return transparent
         }
 
