@@ -216,6 +216,12 @@ div:has(> #bm-button-teleport) {
   margin-left: 0.5ch;
 }
 
+/* Prevent shrinking of the control group so the small display stays visible */
+#bm-charge-spinner-container,
+#bm-spinner-container {
+  white-space: nowrap; /* keep elements on one line */
+}
+
 /* Inputs: slightly narrower so controls and small info fit on narrow overlays */
 #bm-input-protection-delay,
 #bm-input-charge-limit {
@@ -259,6 +265,14 @@ div:has(> #bm-button-teleport) {
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
+}
+
+/* Ensure small display doesn't shrink and stays visible */
+#bm-delay-seconds,
+#bm-charge-limit-display {
+  min-width: 2.2ch;
+  flex-shrink: 0;
+  text-align: right;
 }
 
 /* Left spinner buttons */
@@ -308,6 +322,39 @@ div:has(> #bm-button-teleport) {
 #bm-contain-userinfo p {
   font-size: 0.95rem; /* make the user info text slightly larger/readable */
   margin: 0; /* compact display */
+}
+
+/* Responsive: when overlay is narrow, stack label above controls to avoid overlap */
+@media (max-width: 260px) {
+  #bm-contain-protection-delay,
+  #bm-contain-charge-limit {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.25rem;
+  }
+
+  /* Move controls to the right on their own row */
+  #bm-spinner-container,
+  #bm-charge-spinner-container {
+    justify-content: flex-end;
+    margin-left: 0;
+  }
+
+  /* Slightly reduce control sizes to save space on tiny overlays */
+  #bm-button-delay-decrease,
+  #bm-button-delay-increase,
+  #bm-button-charge-decrease,
+  #bm-button-charge-increase {
+    width: 22px;
+    height: 22px;
+    font-size: 12px;
+  }
+
+  #bm-input-protection-delay,
+  #bm-input-charge-limit {
+    width: 3.5ch;
+    height: 20px;
+  }
 }
 
 /* Removes scroll bar on tile & pixel input fields */
