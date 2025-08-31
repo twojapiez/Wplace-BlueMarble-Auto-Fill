@@ -196,6 +196,7 @@ div:has(> #bm-button-teleport) {
 #bm-contain-charge-limit > p {
   margin: 0;
   white-space: nowrap;
+    font-size: smaller;
 }
 
 /* Protection delay and charge limit spinner containers */

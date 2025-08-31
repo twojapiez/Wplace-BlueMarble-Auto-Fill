@@ -491,10 +491,10 @@ function buildOverlayMain() {
     .addInput({ 'type': 'number', 'id': 'bm-input-ty', 'placeholder': 'Tl Y', 'min': 0, 'max': 2047, 'step': 1, 'required': true }).buildElement()
     .addInput({ 'type': 'number', 'id': 'bm-input-px', 'placeholder': 'Px X', 'min': 0, 'max': 2047, 'step': 1, 'required': true }).buildElement()
     .addInput({ 'type': 'number', 'id': 'bm-input-py', 'placeholder': 'Px Y', 'min': 0, 'max': 2047, 'step': 1, 'required': true }).buildElement()
-    .addDiv({ 'id': 'bm-contain-protection-delay' })
-    .addP({ 'textContent': 'Protection Delay:' }).buildElement()
-    .addDiv({ 'id': 'bm-spinner-container' })
-    .addButton({ 'id': 'bm-button-delay-decrease', 'textContent': '−' }, (instance, button) => {
+    .addDiv({ 'id': 'bm-contain-protection-delay', 'style': 'display: flex; align-items: center; gap: 0.5ch; margin-top: 0.5em;' })
+    .addP({ 'textContent': 'Protection Delay:', 'style': 'margin: 0; white-space: nowrap;' }).buildElement()
+    .addDiv({ 'id': 'bm-spinner-container', 'style': 'display: flex; align-items: center;' })
+    .addButton({ 'id': 'bm-button-delay-decrease', 'textContent': '−', 'style': 'width: 24px; height: 24px; padding: 0; border-radius: 4px 0 0 4px; border: 1px solid #ccc; font-size: 16px; line-height: 1; margin: 0;' }, (instance, button) => {
       button.onclick = () => {
         const input = document.querySelector('#bm-input-protection-delay');
         let value = parseInt(input.value) || 0;
@@ -508,7 +508,7 @@ function buildOverlayMain() {
         }
       };
     }).buildElement()
-    .addInput({ 'type': 'number', 'id': 'bm-input-protection-delay', 'value': '0', 'min': '0', 'max': '60', 'step': '1' }, (instance, input) => {
+    .addInput({ 'type': 'number', 'id': 'bm-input-protection-delay', 'value': '0', 'min': '0', 'max': '60', 'step': '1', 'style': 'width: 50px; text-align: center; border: 1px solid #ccc; border-left: 0; border-right: 0; border-radius: 0; margin: 0; height: 24px;' }, (instance, input) => {
       input.oninput = () => {
         let value = parseInt(input.value) || 0;
         if (value < 0) {
@@ -525,7 +525,7 @@ function buildOverlayMain() {
         }
       };
     }).buildElement()
-    .addButton({ 'id': 'bm-button-delay-increase', 'textContent': '+' }, (instance, button) => {
+    .addButton({ 'id': 'bm-button-delay-increase', 'textContent': '+', 'style': 'width: 24px; height: 24px; padding: 0; border-radius: 0 4px 4px 0; border: 1px solid #ccc; font-size: 16px; line-height: 1; margin: 0;' }, (instance, button) => {
       button.onclick = () => {
         const input = document.querySelector('#bm-input-protection-delay');
         let value = parseInt(input.value) || 0;
@@ -539,15 +539,28 @@ function buildOverlayMain() {
         }
       };
     }).buildElement()
-    .addSmall({ 'id': 'bm-delay-seconds', 'textContent': '(0s)' }).buildElement()
+    .addSmall({ 'id': 'bm-delay-seconds', 'textContent': '(0s)', 'style': 'margin-left: 0.5ch;' }).buildElement()
     .buildElement()
     .buildElement()
-    .addDiv({ 'id': 'bm-contain-charge-limit' })
-    .addP({ 'textContent': 'Charge Limit:' }).buildElement()
-    .addDiv({ 'id': 'bm-charge-spinner-container' })
-    .addButton({ 'id': 'bm-button-charge-decrease', 'textContent': '−' }, (instance, button) => {
+    .addDiv({ 'id': 'bm-contain-charge-limit', 'style': 'display: flex; align-items: center; gap: 0.5ch; margin-top: 0.5em;' })
+    .addP({ 'textContent': 'Charge Limit:', 'style': 'margin: 0; white-space: nowrap;' }).buildElement()
+    .addDiv({ 'id': 'bm-charge-spinner-container', 'style': 'display: flex; align-items: center;' })
+    .addButton({ 'id': 'bm-button-charge-decrease', 'textContent': '−', 'style': 'width: 24px; height: 24px; padding: 0; border-radius: 4px 0 0 4px; border: 1px solid #ccc; font-size: 16px; line-height: 1; margin: 0;' }, (instance, button) => {
       button.onclick = () => {
         const input = document.querySelector('#bm-input-charge-limit');
+        const chargeLimitDisplay = document.querySelector('#bm-charge-limit-display');
+        
+        // Check if charge max has changed and update UI
+        if (instance.apiManager?.charges?.max) {
+          const currentMax = Math.floor(instance.apiManager.charges.max);
+          if (parseInt(input.max) !== currentMax) {
+            input.max = currentMax;
+            if (chargeLimitDisplay) {
+              chargeLimitDisplay.textContent = `/${currentMax}`;
+            }
+          }
+        }
+        
         let value = parseInt(input.value) || 1;
         if (value > 1) {
           value--;
@@ -555,15 +568,34 @@ function buildOverlayMain() {
         }
       };
     }).buildElement()
-    .addInput({ 'type': 'number', 'id': 'bm-input-charge-limit', 'value': '10', 'min': '1', 'max': '10', 'step': '1' }, (instance, input) => {
+    .addInput({ 'type': 'number', 'id': 'bm-input-charge-limit', 'value': '10', 'min': '1', 'max': '10', 'step': '1', 'style': 'width: 50px; text-align: center; border: 1px solid #ccc; border-left: 0; border-right: 0; border-radius: 0; margin: 0; height: 24px;' }, (instance, input) => {
       // Initialize with user's current max charges or default to 10
       const userCharges = instance.apiManager?.charges;
       if (userCharges && userCharges.max) {
         input.max = userCharges.max;
         input.value = Math.min(parseInt(input.value) || 10, userCharges.max);
+        
+        // Update the display as well
+        const chargeLimitDisplay = document.querySelector('#bm-charge-limit-display');
+        if (chargeLimitDisplay) {
+          chargeLimitDisplay.textContent = `/${userCharges.max}`;
+        }
       }
       
       input.oninput = () => {
+        const chargeLimitDisplay = document.querySelector('#bm-charge-limit-display');
+        
+        // Check if charge max has changed and update UI
+        if (instance.apiManager?.charges?.max) {
+          const currentMax = Math.floor(instance.apiManager.charges.max);
+          if (parseInt(input.max) !== currentMax) {
+            input.max = currentMax;
+            if (chargeLimitDisplay) {
+              chargeLimitDisplay.textContent = `/${currentMax}`;
+            }
+          }
+        }
+        
         let value = parseInt(input.value) || 1;
         const maxCharges = parseInt(input.max) || 10;
         if (value < 1) {
@@ -576,9 +608,22 @@ function buildOverlayMain() {
         }
       };
     }).buildElement()
-    .addButton({ 'id': 'bm-button-charge-increase', 'textContent': '+' }, (instance, button) => {
+    .addButton({ 'id': 'bm-button-charge-increase', 'textContent': '+', 'style': 'width: 24px; height: 24px; padding: 0; border-radius: 0 4px 4px 0; border: 1px solid #ccc; font-size: 16px; line-height: 1; margin: 0;' }, (instance, button) => {
       button.onclick = () => {
         const input = document.querySelector('#bm-input-charge-limit');
+        const chargeLimitDisplay = document.querySelector('#bm-charge-limit-display');
+        
+        // Check if charge max has changed and update UI
+        if (instance.apiManager?.charges?.max) {
+          const currentMax = Math.floor(instance.apiManager.charges.max);
+          if (parseInt(input.max) !== currentMax) {
+            input.max = currentMax;
+            if (chargeLimitDisplay) {
+              chargeLimitDisplay.textContent = `/${currentMax}`;
+            }
+          }
+        }
+        
         let value = parseInt(input.value) || 1;
         const maxCharges = parseInt(input.max) || 10;
         if (value < maxCharges) {
@@ -587,7 +632,7 @@ function buildOverlayMain() {
         }
       };
     }).buildElement()
-    .addSmall({ 'id': 'bm-charge-limit-display', 'textContent': '/10' }).buildElement()
+    .addSmall({ 'id': 'bm-charge-limit-display', 'textContent': 'N/A', 'style': 'margin-left: 0.5ch;' }).buildElement()
     .buildElement()
     .buildElement()
     .buildElement()
@@ -751,30 +796,35 @@ function buildOverlayMain() {
             this.instance.apiManager?.templateManager?.templatesShouldBeDrawn;
         }
 
+        updateChargeLimitUI() {
+          const chargeLimitInput = document.querySelector('#bm-input-charge-limit');
+          const chargeLimitDisplay = document.querySelector('#bm-charge-limit-display');
+          
+          if (chargeLimitInput && this.instance.apiManager?.charges?.max) {
+            const userMaxCharges = Math.floor(this.instance.apiManager.charges.max);
+            chargeLimitInput.max = userMaxCharges;
+            
+            // Ensure current value doesn't exceed new max
+            const currentValue = parseInt(chargeLimitInput.value) || 1;
+            if (currentValue > userMaxCharges) {
+              chargeLimitInput.value = userMaxCharges;
+            }
+            
+            // Update display text
+            if (chargeLimitDisplay) {
+              chargeLimitDisplay.textContent = `/${userMaxCharges}`;
+            }
+          }
+        }
+
         async refreshUserData() {
           try {
             const userData = await this.instance.apiManager.fetchUserData();
             if (userData) {
               console.log('AUTOFILL: Fetched fresh user data');
               
-              // Update charge limit field max value based on user's actual max charges
-              const chargeLimitInput = document.querySelector('#bm-input-charge-limit');
-              const chargeLimitDisplay = document.querySelector('#bm-charge-limit-display');
-              if (chargeLimitInput && userData.charges && userData.charges.max) {
-                const userMaxCharges = Math.floor(userData.charges.max);
-                chargeLimitInput.max = userMaxCharges;
-                
-                // Ensure current value doesn't exceed new max
-                const currentValue = parseInt(chargeLimitInput.value) || 1;
-                if (currentValue > userMaxCharges) {
-                  chargeLimitInput.value = userMaxCharges;
-                }
-                
-                // Update display text
-                if (chargeLimitDisplay) {
-                  chargeLimitDisplay.textContent = `/${userMaxCharges}`;
-                }
-              }
+              // Update charge limit UI with the latest max charges
+              this.updateChargeLimitUI();
             } else {
               console.warn('AUTOFILL: Failed to fetch fresh user data, continuing with cached data');
             }
@@ -1896,5 +1946,20 @@ function buildOverlayMain() {
         if (modeBtn) modeBtn.disabled = true;
         if (protectBtn) protectBtn.disabled = true;
       }
-  }, 0)
+
+      // Update charge limit display with current charge max from API manager
+      const chargeLimitInput = document.querySelector('#bm-input-charge-limit');
+      const chargeLimitDisplay = document.querySelector('#bm-charge-limit-display');
+      if (chargeLimitInput && chargeLimitDisplay && overlayMain.apiManager?.charges?.max) {
+        const currentMax = Math.floor(overlayMain.apiManager.charges.max);
+        chargeLimitInput.max = currentMax;
+        chargeLimitDisplay.textContent = `/${currentMax}`;
+        
+        // Ensure current value doesn't exceed new max
+        const currentValue = parseInt(chargeLimitInput.value) || 1;
+        if (currentValue > currentMax) {
+          chargeLimitInput.value = currentMax;
+        }
+      }
+  }, 1000)
 }
