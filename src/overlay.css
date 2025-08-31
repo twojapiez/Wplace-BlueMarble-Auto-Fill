@@ -194,12 +194,12 @@ div:has(> #bm-button-teleport) {
   box-sizing: border-box;
 }
 
-/* Protection delay and charge limit labels (main text) */
+/* Protection delay and charge limit labels (main text) - keep label size consistent with surrounding text */
 #bm-contain-protection-delay > p,
 #bm-contain-charge-limit > p {
   margin: 0;
   white-space: nowrap;
-  font-size: small;
+  font-size: inherit; /* don't scale labels down */
   text-align: left;
   flex: 1 1 auto; /* let the label take remaining space */
   overflow: hidden;
@@ -298,6 +298,16 @@ div:has(> #bm-button-teleport) {
   white-space: nowrap;
   font-size: small; /* make it readable */
   flex: 0 0 auto;
+}
+
+/* Scale the main description/header and userinfo text for emphasis */
+#bm-overlay h1 {
+  font-size: 1.15rem; /* slightly larger than x-large in previous rule */
+}
+
+#bm-contain-userinfo p {
+  font-size: 0.95rem; /* make the user info text slightly larger/readable */
+  margin: 0; /* compact display */
 }
 
 /* Removes scroll bar on tile & pixel input fields */
