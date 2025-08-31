@@ -915,7 +915,7 @@ function buildOverlayMain() {
           }
         }
 
-        async executeCycle() {
+  async executeCycle() {
           console.log(`AUTOFILL: Starting cycle in ${this.state.mode} mode`);
           const cycleResult = await this.analyzeSituation();
           console.log(`D_AUTOFILL: Cycle result action: ${cycleResult.action}`);
@@ -925,7 +925,7 @@ function buildOverlayMain() {
               await this.placePixels(cycleResult.pixels.chunkGroups);
               break;
             case 'WAIT_FOR_CHARGES':
-              await this.waitForCharges(cycleResult.waitTime);
+              await this.waitForCharges(cycleResult.waitTime, cycleResult.pixelsNeeded);
               break;
             case 'START_PROTECTION':
               this.startProtectionMode();
@@ -966,7 +966,8 @@ function buildOverlayMain() {
           if (this.chargeManager.shouldWaitForCharges(charges, totalPixelCount)) {
             const waitTime = this.chargeManager.calculateWaitTime(charges, totalPixelCount);
             console.log(`D_AUTOFILL: Waiting for charges - waitTime: ${waitTime}ms`);
-            return { action: 'WAIT_FOR_CHARGES', waitTime };
+            // Return pixelsNeeded so the wait loop can adapt if the user changes the charge limit
+            return { action: 'WAIT_FOR_CHARGES', waitTime, pixelsNeeded: totalPixelCount };
           }
 
           console.log(`D_AUTOFILL: Proceeding to place ${totalPixelCount} pixels in ${pixelsToPlace.chunkGroups.length} chunks`);
@@ -1004,30 +1005,59 @@ function buildOverlayMain() {
           await this.sleep(this.config.cycleDelay);
         }
 
-        async waitForCharges(waitTime) {
+        async waitForCharges(waitTime, pixelsNeeded) {
           this.setState('WAITING_CHARGES');
-          const charges = this.instance.apiManager?.charges;
-          
-          // Get user-defined charge limit
+
+          // Initial snapshot
+          let charges = this.instance.apiManager?.charges;
+
+          // Get user-defined charge limit input element (may change during wait)
           const chargeLimitInput = document.querySelector('#bm-input-charge-limit');
-          const chargeLimit = parseInt(chargeLimitInput?.value || charges?.max || 10);
-          
+
+          // Compute initial chargeLimit value (fallback to API max or 10)
+          let chargeLimit = parseInt(chargeLimitInput?.value || (charges?.max ? Math.floor(charges.max) : 10));
+
           console.log(`AUTOFILL: Waiting ${(waitTime / 1000).toFixed(1)}s for charges (${charges?.count?.toFixed(2)}/${chargeLimit})`);
           this.updateUI(`⏱️ Waiting ${this.formatTime(waitTime / 1000)} for charges`);
 
-          const endTime = Date.now() + waitTime;
+          let endTime = Date.now() + waitTime;
           let iterations = 0;
 
           while (Date.now() < endTime && this.state.isRunning) {
             iterations++;
-            if (iterations % 10 === 0) {
-              await this.refreshUserData();
-              const newCharges = this.instance.apiManager?.charges;
-              if (newCharges && newCharges.count >= chargeLimit) {
-                console.log("AUTOFILL: Charge limit reached after refresh, proceeding");
-                this.updateUI('✅ Charge limit reached - proceeding!');
-                return;
+
+            // Every iteration, re-read user input and (periodically) refresh API data so we can adapt
+            const inputVal = parseInt(chargeLimitInput?.value || '') || null;
+            if (inputVal !== null) {
+              // If the user has changed the input, update chargeLimit
+              if (inputVal !== chargeLimit) {
+                chargeLimit = inputVal;
+                console.log(`AUTOFILL: Detected charge limit input change -> ${chargeLimit}`);
               }
+            }
+
+            // Periodically refresh API data to get updated charge count and recharge timers
+            if (iterations % 5 === 0) {
+              await this.refreshUserData();
+              charges = this.instance.apiManager?.charges;
+            }
+
+            // If charges meet or exceed the (possibly updated) user-defined limit, exit early
+            const currentCount = charges?.count || 0;
+            if (currentCount >= chargeLimit) {
+              console.log('AUTOFILL: Charge limit reached during wait, proceeding');
+              this.updateUI('✅ Charge limit reached - proceeding!');
+              return;
+            }
+
+            // Recalculate how long we should wait based on fresh state.
+            const recalculated = this.chargeManager.calculateWaitTime(charges || { count: 0, rechargeTime: 30000, max: chargeLimit }, pixelsNeeded);
+
+            // If recalculated wait exceeds remaining time, extend endTime to wait the longer duration
+            const remainingNow = Math.max(0, endTime - Date.now());
+            if (recalculated > remainingNow) {
+              endTime = Date.now() + recalculated;
+              console.log(`AUTOFILL: Extending wait to ${recalculated}ms based on updated inputs/state`);
             }
 
             const remaining = Math.max(0, endTime - Date.now());
@@ -1885,7 +1915,7 @@ function buildOverlayMain() {
                 document.dispatchEvent(escEvent);
                 console.log('AUTOFILL: Dispatched Escape key to close modal');
                 await sleep(150);
-              } catch (e) { /* ignore */ }
+              } catch (e) { /*C ignore */ }
 
               // Click on the canvas to defocus any modal
               const canvas = document.querySelector('.maplibregl-canvas');
