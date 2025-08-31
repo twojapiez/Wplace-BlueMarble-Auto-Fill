@@ -301,6 +301,7 @@ function buildOverlayMain() {
             '#bm-overlay hr',                    // Visual separator lines
             '#bm-contain-automation > *:not(#bm-contain-coords)', // Automation section excluding coordinates
             '#bm-contain-protection-delay',      // Protection delay spinner
+            '#bm-contain-charge-limit',          // Charge limit spinner
             '#bm-input-file-template',           // Template file upload interface
             '#bm-contain-buttons-action',        // Action buttons container
             `#${instance.outputStatusId}`,       // Main status log textarea for user feedback
@@ -490,10 +491,10 @@ function buildOverlayMain() {
     .addInput({ 'type': 'number', 'id': 'bm-input-ty', 'placeholder': 'Tl Y', 'min': 0, 'max': 2047, 'step': 1, 'required': true }).buildElement()
     .addInput({ 'type': 'number', 'id': 'bm-input-px', 'placeholder': 'Px X', 'min': 0, 'max': 2047, 'step': 1, 'required': true }).buildElement()
     .addInput({ 'type': 'number', 'id': 'bm-input-py', 'placeholder': 'Px Y', 'min': 0, 'max': 2047, 'step': 1, 'required': true }).buildElement()
-    .addDiv({ 'id': 'bm-contain-protection-delay', 'style': 'display: flex; align-items: center; gap: 0.5ch; margin-top: 0.5em;' })
-    .addP({ 'textContent': 'Protection Delay:', 'style': 'margin: 0; white-space: nowrap;' }).buildElement()
-    .addDiv({ 'id': 'bm-spinner-container', 'style': 'display: flex; align-items: center;' })
-    .addButton({ 'id': 'bm-button-delay-decrease', 'textContent': '−', 'style': 'width: 24px; height: 24px; padding: 0; border-radius: 4px 0 0 4px; border: 1px solid #ccc; font-size: 16px; line-height: 1; margin: 0;' }, (instance, button) => {
+    .addDiv({ 'id': 'bm-contain-protection-delay' })
+    .addP({ 'textContent': 'Protection Delay:' }).buildElement()
+    .addDiv({ 'id': 'bm-spinner-container' })
+    .addButton({ 'id': 'bm-button-delay-decrease', 'textContent': '−' }, (instance, button) => {
       button.onclick = () => {
         const input = document.querySelector('#bm-input-protection-delay');
         let value = parseInt(input.value) || 0;
@@ -507,7 +508,7 @@ function buildOverlayMain() {
         }
       };
     }).buildElement()
-    .addInput({ 'type': 'number', 'id': 'bm-input-protection-delay', 'value': '0', 'min': '0', 'max': '60', 'step': '1', 'style': 'width: 50px; text-align: center; border-radius: 0; border: 1px solid #ccc; border-left: 0; border-right: 0; margin: 0; height: 24px; padding: 0;' }, (instance, input) => {
+    .addInput({ 'type': 'number', 'id': 'bm-input-protection-delay', 'value': '0', 'min': '0', 'max': '60', 'step': '1' }, (instance, input) => {
       input.oninput = () => {
         let value = parseInt(input.value) || 0;
         if (value < 0) {
@@ -524,7 +525,7 @@ function buildOverlayMain() {
         }
       };
     }).buildElement()
-    .addButton({ 'id': 'bm-button-delay-increase', 'textContent': '+', 'style': 'width: 24px; height: 24px; padding: 0; border-radius: 0 4px 4px 0; border: 1px solid #ccc; font-size: 16px; line-height: 1; margin: 0;' }, (instance, button) => {
+    .addButton({ 'id': 'bm-button-delay-increase', 'textContent': '+' }, (instance, button) => {
       button.onclick = () => {
         const input = document.querySelector('#bm-input-protection-delay');
         let value = parseInt(input.value) || 0;
@@ -538,11 +539,105 @@ function buildOverlayMain() {
         }
       };
     }).buildElement()
-    .addSmall({ 'id': 'bm-delay-seconds', 'textContent': '(0s)', 'style': 'margin-left: 0.5ch;' }).buildElement()
+    .addSmall({ 'id': 'bm-delay-seconds', 'textContent': '(0s)' }).buildElement()
+    .buildElement()
+    .buildElement()
+    .addDiv({ 'id': 'bm-contain-charge-limit' })
+    .addP({ 'textContent': 'Charge Limit:' }).buildElement()
+    .addDiv({ 'id': 'bm-charge-spinner-container' })
+    .addButton({ 'id': 'bm-button-charge-decrease', 'textContent': '−' }, (instance, button) => {
+      button.onclick = () => {
+        const input = document.querySelector('#bm-input-charge-limit');
+        let value = parseInt(input.value) || 1;
+        if (value > 1) {
+          value--;
+          input.value = value;
+        }
+      };
+    }).buildElement()
+    .addInput({ 'type': 'number', 'id': 'bm-input-charge-limit', 'value': '10', 'min': '1', 'max': '10', 'step': '1' }, (instance, input) => {
+      // Initialize with user's current max charges or default to 10
+      const userCharges = instance.apiManager?.charges;
+      if (userCharges && userCharges.max) {
+        input.max = userCharges.max;
+        input.value = Math.min(parseInt(input.value) || 10, userCharges.max);
+      }
+      
+      input.oninput = () => {
+        let value = parseInt(input.value) || 1;
+        const maxCharges = parseInt(input.max) || 10;
+        if (value < 1) {
+          value = 1;
+          input.value = value;
+        }
+        if (value > maxCharges) {
+          value = maxCharges;
+          input.value = value;
+        }
+      };
+    }).buildElement()
+    .addButton({ 'id': 'bm-button-charge-increase', 'textContent': '+' }, (instance, button) => {
+      button.onclick = () => {
+        const input = document.querySelector('#bm-input-charge-limit');
+        let value = parseInt(input.value) || 1;
+        const maxCharges = parseInt(input.max) || 10;
+        if (value < maxCharges) {
+          value++;
+          input.value = value;
+        }
+      };
+    }).buildElement()
+    .addSmall({ 'id': 'bm-charge-limit-display', 'textContent': '/10' }).buildElement()
     .buildElement()
     .buildElement()
     .buildElement()
-    .addInputFile({ 'id': 'bm-input-file-template', 'textContent': 'Upload Template', 'accept': 'image/png, image/jpeg, image/webp, image/bmp, image/gif' }).buildElement()
+    .addInputFile({ 'id': 'bm-input-file-template', 'textContent': 'Upload Template', 'accept': 'image/png, image/jpeg, image/webp, image/bmp, image/gif' }, (instance, input) => {
+      input.addEventListener('change', (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+        
+        const fileName = file.name;
+        console.log(`AUTOFILL: Parsing filename for coordinates: ${fileName}`);
+        
+        // Remove file extension
+        const nameWithoutExtension = fileName.replace(/\.[^/.]+$/, '');
+        
+        // Look for pattern with 4 numbers (1-4 digits each) separated by hyphens
+        // Example: example-1075-705-668-256-deface-border
+        const coordinatePattern = /(\d{1,4})-(\d{1,4})-(\d{1,4})-(\d{1,4})/;
+        const match = nameWithoutExtension.match(coordinatePattern);
+        
+        if (match) {
+          const [, tlX, tlY, pxX, pxY] = match;
+          console.log(`AUTOFILL: Found coordinates in filename: TlX=${tlX}, TlY=${tlY}, PxX=${pxX}, PxY=${pxY}`);
+          
+          // Populate the coordinate input fields
+          const tlXInput = document.querySelector('#bm-input-tx');
+          const tlYInput = document.querySelector('#bm-input-ty');
+          const pxXInput = document.querySelector('#bm-input-px');
+          const pxYInput = document.querySelector('#bm-input-py');
+          
+          if (tlXInput) tlXInput.value = tlX;
+          if (tlYInput) tlYInput.value = tlY;
+          if (pxXInput) pxXInput.value = pxX;
+          if (pxYInput) pxYInput.value = pxY;
+          
+          instance.handleDisplayStatus(`📍 Auto-populated coordinates from filename: (${tlX},${tlY}) to (${pxX},${pxY})`);
+          
+          // Automatically click the Create button after populating coordinates
+          const createButton = document.querySelector('#bm-button-create');
+          if (createButton) {
+            console.log(`AUTOFILL: Auto-clicking Create button after coordinate population`);
+            setTimeout(() => {
+              createButton.click();
+              instance.handleDisplayStatus(`🚀 Auto-created template with coordinates from filename`);
+            }, 100); // Small delay to ensure coordinates are set
+          }
+        } else {
+          console.log(`AUTOFILL: No coordinate pattern found in filename: ${fileName}`);
+        }
+      });
+    }).buildElement()
     .addDiv({ 'id': 'bm-contain-buttons-template' })
     .addButton({ 'id': 'bm-button-enable', 'textContent': 'Enable' }, (instance, button) => {
       button.onclick = () => {
@@ -552,7 +647,6 @@ function buildOverlayMain() {
         const autoFillBtn = document.querySelector('#bm-button-autofill');
         const modeBtn = document.querySelector('#bm-button-mode');
         const protectBtn = document.querySelector('#bm-button-protect');
-        const waitBtn = document.querySelector('#bm-button-wait');
         if (instance.apiManager?.templateManager?.templatesArray.length && instance.apiManager?.templateManager?.templatesShouldBeDrawn) {
           if (autoFillBtn) {
             autoFillBtn.disabled = false;
@@ -562,9 +656,6 @@ function buildOverlayMain() {
           }
           if (protectBtn) {
             protectBtn.disabled = false;
-          }
-          if (waitBtn) {
-            waitBtn.disabled = false;
           }
 
         }
@@ -599,7 +690,6 @@ function buildOverlayMain() {
         const autoFillBtn = document.querySelector('#bm-button-autofill');
         const modeBtn = document.querySelector('#bm-button-mode');
         const protectBtn = document.querySelector('#bm-button-protect');
-        const waitBtn = document.querySelector('#bm-button-wait');
         if (autoFillBtn) {
           autoFillBtn.disabled = true;
         }
@@ -608,9 +698,6 @@ function buildOverlayMain() {
         }
         if (protectBtn) {
           protectBtn.disabled = true;
-        }
-        if (waitBtn) {
-          waitBtn.disabled = true;
         }
       }
     }).buildElement()
@@ -669,6 +756,25 @@ function buildOverlayMain() {
             const userData = await this.instance.apiManager.fetchUserData();
             if (userData) {
               console.log('AUTOFILL: Fetched fresh user data');
+              
+              // Update charge limit field max value based on user's actual max charges
+              const chargeLimitInput = document.querySelector('#bm-input-charge-limit');
+              const chargeLimitDisplay = document.querySelector('#bm-charge-limit-display');
+              if (chargeLimitInput && userData.charges && userData.charges.max) {
+                const userMaxCharges = Math.floor(userData.charges.max);
+                chargeLimitInput.max = userMaxCharges;
+                
+                // Ensure current value doesn't exceed new max
+                const currentValue = parseInt(chargeLimitInput.value) || 1;
+                if (currentValue > userMaxCharges) {
+                  chargeLimitInput.value = userMaxCharges;
+                }
+                
+                // Update display text
+                if (chargeLimitDisplay) {
+                  chargeLimitDisplay.textContent = `/${userMaxCharges}`;
+                }
+              }
             } else {
               console.warn('AUTOFILL: Failed to fetch fresh user data, continuing with cached data');
             }
@@ -806,15 +912,11 @@ function buildOverlayMain() {
           const totalPixelCount = pixelsToPlace.totalRemainingPixels;
           console.log(`D_AUTOFILL: Before charge check - chunks: ${pixelsToPlace.length}, totalPixels: ${totalPixelCount}, charges:`, charges);
           
-          // Check if wait mode is enabled before waiting for charges
-          if (window.bmWaitMode && this.chargeManager.shouldWaitForCharges(charges, totalPixelCount)) {
+          // Always wait for charges if needed
+          if (this.chargeManager.shouldWaitForCharges(charges, totalPixelCount)) {
             const waitTime = this.chargeManager.calculateWaitTime(charges, totalPixelCount);
             console.log(`D_AUTOFILL: Waiting for charges - waitTime: ${waitTime}ms`);
             return { action: 'WAIT_FOR_CHARGES', waitTime };
-          }
-
-          if (!window.bmWaitMode && this.chargeManager.shouldWaitForCharges(charges, totalPixelCount)) {
-            console.log(`D_AUTOFILL: Wait mode disabled - proceeding without waiting for charges`);
           }
 
           console.log(`D_AUTOFILL: Proceeding to place ${totalPixelCount} pixels in ${pixelsToPlace.chunkGroups.length} chunks`);
@@ -855,7 +957,12 @@ function buildOverlayMain() {
         async waitForCharges(waitTime) {
           this.setState('WAITING_CHARGES');
           const charges = this.instance.apiManager?.charges;
-          console.log(`AUTOFILL: Waiting ${(waitTime / 1000).toFixed(1)}s for charges (${charges?.count?.toFixed(2)}/${charges?.max})`);
+          
+          // Get user-defined charge limit
+          const chargeLimitInput = document.querySelector('#bm-input-charge-limit');
+          const chargeLimit = parseInt(chargeLimitInput?.value || charges?.max || 10);
+          
+          console.log(`AUTOFILL: Waiting ${(waitTime / 1000).toFixed(1)}s for charges (${charges?.count?.toFixed(2)}/${chargeLimit})`);
           this.updateUI(`⏱️ Waiting ${this.formatTime(waitTime / 1000)} for charges`);
 
           const endTime = Date.now() + waitTime;
@@ -866,9 +973,9 @@ function buildOverlayMain() {
             if (iterations % 10 === 0) {
               await this.refreshUserData();
               const newCharges = this.instance.apiManager?.charges;
-              if (newCharges && newCharges.count >= newCharges.max) {
-                console.log("AUTOFILL: Charges full after refresh, proceeding");
-                this.updateUI('✅ Charges full - proceeding!');
+              if (newCharges && newCharges.count >= chargeLimit) {
+                console.log("AUTOFILL: Charge limit reached after refresh, proceeding");
+                this.updateUI('✅ Charge limit reached - proceeding!');
                 return;
               }
             }
@@ -1073,22 +1180,30 @@ function buildOverlayMain() {
         }
 
         shouldWaitForCharges(charges, pixelsNeeded) {
-          if (charges.count >= charges.max) return false;
+          // Get user-defined charge limit
+          const chargeLimitInput = document.querySelector('#bm-input-charge-limit');
+          const chargeLimit = parseInt(chargeLimitInput?.value || charges.max);
+          
+          if (charges.count >= chargeLimit) return false;
           const currentCharges = Math.floor(charges.count);
           const shouldWait = pixelsNeeded > currentCharges;
-          console.log(`D_AUTOFILL: shouldWaitForCharges - pixelsNeeded: ${pixelsNeeded}, currentCharges: ${currentCharges}, charges.count: ${charges.count}, shouldWait: ${shouldWait}`);
+          console.log(`D_AUTOFILL: shouldWaitForCharges - pixelsNeeded: ${pixelsNeeded}, currentCharges: ${currentCharges}, charges.count: ${charges.count}, chargeLimit: ${chargeLimit}, shouldWait: ${shouldWait}`);
           return shouldWait;
         }
 
         calculateWaitTime(charges, pixelsNeeded) {
+          // Get user-defined charge limit
+          const chargeLimitInput = document.querySelector('#bm-input-charge-limit');
+          const chargeLimit = parseInt(chargeLimitInput?.value || charges.max);
+          
           const currentCharges = Math.floor(charges.count);
-          // Cap the needed charges at max available charges
-          const targetCharges = Math.min(pixelsNeeded, charges.max);
+          // Cap the needed charges at the user-defined charge limit (not max charges)
+          const targetCharges = Math.min(pixelsNeeded, chargeLimit);
           const chargesNeeded = targetCharges - currentCharges;
           const partialCharge = charges.count - Math.floor(charges.count);
           const chargeRate = charges.rechargeTime || 30000; // 30s default
 
-          console.log(`D_AUTOFILL: calculateWaitTime - pixelsNeeded: ${pixelsNeeded}, targetCharges: ${targetCharges}, currentCharges: ${currentCharges}, chargesNeeded: ${chargesNeeded}`);
+          console.log(`D_AUTOFILL: calculateWaitTime - pixelsNeeded: ${pixelsNeeded}, targetCharges: ${targetCharges}, currentCharges: ${currentCharges}, chargesNeeded: ${chargesNeeded}, chargeLimit: ${chargeLimit}`);
 
           // If we need less than 1 additional charge, just wait for the current partial charge to complete
           if (chargesNeeded <= 1) {
@@ -1749,21 +1864,6 @@ function buildOverlayMain() {
         window.bmProtectMode = isProtectModeOn;
       };
     }).buildElement()
-    .addButton({ 'id': 'bm-button-wait', 'textContent': 'Wait: On', 'disabled': true }, (instance, button) => {
-      let isWaitModeOn = true; // Default to On
-
-      button.onclick = () => {
-        isWaitModeOn = !isWaitModeOn;
-        button.textContent = `Wait: ${isWaitModeOn ? 'On' : 'Off'}`;
-        instance.handleDisplayStatus(`⏱️ Charge waiting ${isWaitModeOn ? 'enabled' : 'disabled'}`);
-
-        // Store the wait mode state globally so auto-fill can access it
-        window.bmWaitMode = isWaitModeOn;
-      };
-
-      // Initialize the global state
-      window.bmWaitMode = true;
-    }).buildElement()
     .buildElement()
     .addTextarea({ 'id': overlayMain.outputStatusId, 'placeholder': `Status: Sleeping...\nVersion: ${version}`, 'readOnly': true }).buildElement()
     .addTextarea({ 'id': 'bm-autofill-output', 'placeholder': 'Auto-Fill Output:\nWaiting for auto-fill to start...', 'readOnly': true }).buildElement()
@@ -1787,17 +1887,14 @@ function buildOverlayMain() {
     const autoFillBtn = document.querySelector('#bm-button-autofill');
     const modeBtn = document.querySelector('#bm-button-mode');
     const protectBtn = document.querySelector('#bm-button-protect');
-    const waitBtn = document.querySelector('#bm-button-wait');
       if (overlayMain.apiManager?.templateManager?.templatesArray.length && overlayMain.apiManager?.templateManager?.templatesShouldBeDrawn) {
         if (autoFillBtn) autoFillBtn.disabled = false;
         if (modeBtn) modeBtn.disabled = false;
         if (protectBtn) protectBtn.disabled = false;
-        if (waitBtn) waitBtn.disabled = false;
       } else {
         if (autoFillBtn) autoFillBtn.disabled = true;
         if (modeBtn) modeBtn.disabled = true;
         if (protectBtn) protectBtn.disabled = true;
-        if (waitBtn) waitBtn.disabled = true;
       }
   }, 0)
 }
