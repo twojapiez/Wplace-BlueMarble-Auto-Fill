@@ -492,9 +492,9 @@ function buildOverlayMain() {
     .addInput({ 'type': 'number', 'id': 'bm-input-px', 'placeholder': 'Px X', 'min': 0, 'max': 2047, 'step': 1, 'required': true }).buildElement()
     .addInput({ 'type': 'number', 'id': 'bm-input-py', 'placeholder': 'Px Y', 'min': 0, 'max': 2047, 'step': 1, 'required': true }).buildElement()
     .addDiv({ 'id': 'bm-contain-protection-delay', 'style': 'display: flex; align-items: center; gap: 0.5ch; margin-top: 0.5em;' })
-    .addP({ 'textContent': 'Protection Delay:', 'style': 'margin: 0; white-space: nowrap;' }).buildElement()
+    .addP({ 'textContent': 'Protect Delay:', 'style': 'margin: 0; white-space: nowrap;' }).buildElement()
     .addDiv({ 'id': 'bm-spinner-container', 'style': 'display: flex; align-items: center;' })
-    .addButton({ 'id': 'bm-button-delay-decrease', 'textContent': '−', 'style': 'width: 24px; height: 24px; padding: 0; border-radius: 4px 0 0 4px; border: 1px solid #ccc; font-size: 16px; line-height: 1; margin: 0;' }, (instance, button) => {
+    .addButton({ 'id': 'bm-button-delay-decrease', 'textContent': '-', 'style': 'width: 24px; height: 24px; padding: 0; border-radius: 4px 0 0 4px; border: 1px solid #ccc; font-size: 16px; line-height: 1; margin: 0;' }, (instance, button) => {
       button.onclick = () => {
         const input = document.querySelector('#bm-input-protection-delay');
         let value = parseInt(input.value) || 0;
@@ -1852,6 +1852,54 @@ function buildOverlayMain() {
           );
 
           if (!finalButtonResult.success) {
+            // Attempt to gracefully close the paint menu before failing
+            try {
+              console.warn('AUTOFILL: Final paint button not found or disabled - attempting to close paint menu');
+              updateAutoFillOutput('⚠️ Final paint button missing or disabled - trying to close paint menu...');
+
+              // Common close selectors used by the paint UI
+              const closeSelectors = [
+                '.btn.btn-secondary',
+                '.modal-close',
+                '.close',
+                '[aria-label="Close"]',
+                '.btn.btn-outline' // fallback
+              ];
+
+              // Try clicking the first visible close button
+              for (const sel of closeSelectors) {
+                const el = document.querySelector(sel);
+                if (el) {
+                  try {
+                    el.click();
+                    console.log(`AUTOFILL: Clicked close element (${sel})`);
+                    await sleep(150);
+                    break;
+                  } catch (e) { /* ignore click failures */ }
+                }
+              }
+
+              // Dispatch Escape key as a fallback
+              try {
+                const escEvent = new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true });
+                document.dispatchEvent(escEvent);
+                console.log('AUTOFILL: Dispatched Escape key to close modal');
+                await sleep(150);
+              } catch (e) { /* ignore */ }
+
+              // Click on the canvas to defocus any modal
+              const canvas = document.querySelector('.maplibregl-canvas');
+              if (canvas) {
+                try {
+                  canvas.click();
+                  console.log('AUTOFILL: Clicked canvas to close any overlays');
+                  await sleep(150);
+                } catch (e) {}
+              }
+            } catch (innerErr) {
+              console.warn('AUTOFILL: Error while attempting to close paint menu', innerErr);
+            }
+
             throw new Error(`Could not find or enable final paint button: ${finalButtonResult.reason}`);
           }
 
