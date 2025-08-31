@@ -182,36 +182,47 @@ div:has(> #bm-button-teleport) {
   font-size: small;
 }
 
-/* Protection delay spinner container */
+/* Protection delay & Charge limit layout: labels left, controls right */
 #bm-contain-protection-delay,
 #bm-contain-charge-limit {
   display: flex;
   align-items: center;
+  justify-content: space-between; /* label on the left, controls on the right */
   gap: 0.5ch;
   margin-top: 0.5em;
+  width: 100%;
+  box-sizing: border-box;
 }
 
-/* Protection delay and charge limit labels */
+/* Protection delay and charge limit labels (main text) */
 #bm-contain-protection-delay > p,
 #bm-contain-charge-limit > p {
   margin: 0;
   white-space: nowrap;
-    font-size: smaller;
+  font-size: small;
+  text-align: left;
+  flex: 1 1 auto; /* let the label take remaining space */
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-/* Protection delay and charge limit spinner containers */
+/* Spinner container (controls) — keep fixed width, right aligned */
 #bm-spinner-container,
 #bm-charge-spinner-container {
   display: flex;
   align-items: center;
+  gap: 0.25ch;
+  flex: 0 0 auto; /* don't stretch */
+  margin-left: 0.5ch;
 }
 
-/* Protection delay and charge limit input fields */
+/* Inputs: slightly narrower so controls and small info fit on narrow overlays */
 #bm-input-protection-delay,
 #bm-input-charge-limit {
   appearance: auto;
   -moz-appearance: textfield;
-  width: 50px;
+  width: 4.5ch;
+  min-width: 3.2ch;
   text-align: center;
   background-color: rgba(0, 0, 0, 0.2);
   color: white;
@@ -222,30 +233,32 @@ div:has(> #bm-button-teleport) {
   padding: 2px 4px;
   font-size: small;
   font-family: inherit;
-  height: 24px;
+  height: 22px;
   margin: 0;
   box-sizing: border-box;
+  flex: 0 0 auto;
 }
 
-/* Protection delay and charge limit spinner buttons */
+/* Spinner buttons: slightly bigger hit area and scaled text */
 #bm-button-delay-decrease,
 #bm-button-delay-increase,
 #bm-button-charge-decrease,
 #bm-button-charge-increase {
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
   padding: 0;
   margin: 0;
   border: 1px solid rgba(255, 255, 255, 0.3);
   background-color: #144eb9;
   color: white;
-  font-size: 16px;
+  font-size: 13px;
   line-height: 1;
   cursor: pointer;
   user-select: none;
   display: flex;
   align-items: center;
   justify-content: center;
+  flex: 0 0 auto;
 }
 
 /* Left spinner buttons */
@@ -278,10 +291,13 @@ div:has(> #bm-button-teleport) {
   background-color: #2e97ff !important;
 }
 
-/* Display text for delay seconds and charge limit */
+/* Display text for delay seconds and charge limit (keep visible) */
 #bm-delay-seconds,
 #bm-charge-limit-display {
   margin-left: 0.5ch;
+  white-space: nowrap;
+  font-size: small; /* make it readable */
+  flex: 0 0 auto;
 }
 
 /* Removes scroll bar on tile & pixel input fields */
