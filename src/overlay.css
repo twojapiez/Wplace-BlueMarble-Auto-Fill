@@ -183,15 +183,31 @@ div:has(> #bm-button-teleport) {
 }
 
 /* Protection delay spinner container */
-#bm-contain-protection-delay {
+#bm-contain-protection-delay,
+#bm-contain-charge-limit {
   display: flex;
   align-items: center;
   gap: 0.5ch;
   margin-top: 0.5em;
 }
 
-/* Protection delay input field */
-#bm-input-protection-delay {
+/* Protection delay and charge limit labels */
+#bm-contain-protection-delay > p,
+#bm-contain-charge-limit > p {
+  margin: 0;
+  white-space: nowrap;
+}
+
+/* Protection delay and charge limit spinner containers */
+#bm-spinner-container,
+#bm-charge-spinner-container {
+  display: flex;
+  align-items: center;
+}
+
+/* Protection delay and charge limit input fields */
+#bm-input-protection-delay,
+#bm-input-charge-limit {
   appearance: auto;
   -moz-appearance: textfield;
   width: 50px;
@@ -200,21 +216,28 @@ div:has(> #bm-button-teleport) {
   color: white;
   border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: 0;
+  border-left: 0;
+  border-right: 0;
   padding: 2px 4px;
   font-size: small;
   font-family: inherit;
   height: 24px;
+  margin: 0;
   box-sizing: border-box;
 }
 
-/* Protection delay spinner buttons */
+/* Protection delay and charge limit spinner buttons */
 #bm-button-delay-decrease,
-#bm-button-delay-increase {
+#bm-button-delay-increase,
+#bm-button-charge-decrease,
+#bm-button-charge-increase {
   width: 24px;
   height: 24px;
   padding: 0;
   margin: 0;
   border: 1px solid rgba(255, 255, 255, 0.3);
+  background-color: #144eb9;
+  color: white;
   font-size: 16px;
   line-height: 1;
   cursor: pointer;
@@ -224,24 +247,40 @@ div:has(> #bm-button-teleport) {
   justify-content: center;
 }
 
-#bm-button-delay-decrease {
+/* Left spinner buttons */
+#bm-button-delay-decrease,
+#bm-button-charge-decrease {
   border-radius: 4px 0 0 4px;
   border-right: none;
 }
 
-#bm-button-delay-increase {
+/* Right spinner buttons */
+#bm-button-delay-increase,
+#bm-button-charge-increase {
   border-radius: 0 4px 4px 0;
   border-left: none;
 }
 
+/* Spinner button hover effects */
 #bm-button-delay-decrease:hover,
-#bm-button-delay-increase:hover {
+#bm-button-delay-increase:hover,
+#bm-button-charge-decrease:hover,
+#bm-button-charge-increase:hover {
   background-color: #1061e5 !important;
 }
 
+/* Spinner button active effects */
 #bm-button-delay-decrease:active,
-#bm-button-delay-increase:active {
+#bm-button-delay-increase:active,
+#bm-button-charge-decrease:active,
+#bm-button-charge-increase:active {
   background-color: #2e97ff !important;
+}
+
+/* Display text for delay seconds and charge limit */
+#bm-delay-seconds,
+#bm-charge-limit-display {
+  margin-left: 0.5ch;
 }
 
 /* Removes scroll bar on tile & pixel input fields */
@@ -319,6 +358,8 @@ input[type="file"][id*="template"] {
 #bm-contain-userinfo,
 #bm-contain-automation,
 #bm-contain-coords,
+#bm-contain-protection-delay,
+#bm-contain-charge-limit,
 #bm-contain-buttons-template,
 div:has(> #bm-input-file-template),
 #bm-output-status,
