@@ -20,6 +20,7 @@ export default class ApiManager {
     this.droplets = 0;
     this.charges = null;
     this.extraColorsBitmap = null;
+    this.flagsBitmap = null;
   }
 
   /** Fetches fresh user data from the /me endpoint
@@ -37,6 +38,9 @@ export default class ApiManager {
         // Update API manager properties with fresh data
         if (userData.extraColorsBitmap !== undefined) {
           this.extraColorsBitmap = userData.extraColorsBitmap;
+        }
+        if (userData.flagsBitmap !== undefined) {
+          this.flagsBitmap = userData.flagsBitmap;
         }
         if (userData.droplets !== undefined) {
           this.droplets = userData.droplets;
@@ -114,6 +118,7 @@ export default class ApiManager {
           this.droplets = dataJSON['droplets'];
           this.charges = dataJSON['charges'];
           this.extraColorsBitmap = dataJSON['extraColorsBitmap'];
+          this.flagsBitmap = dataJSON['flagsBitmap'];
           
           overlay.updateInnerHTML('bm-user-name', `Username: <b>${escapeHTML(dataJSON['name'])}</b>`); // Updates the text content of the username field
           overlay.updateInnerHTML('bm-user-droplets', `Droplets: <b>${new Intl.NumberFormat().format(dataJSON['droplets'])}</b>`); // Updates the text content of the droplets field
