@@ -600,11 +600,11 @@ function buildOverlayMain() {
                 const maxCharges = parseInt(input.max) || 10;
                 if (value < 1) {
                     value = 1;
-                    input.value = 10;
+                    input.value = value;
                 }
                 if (value > maxCharges) {
                     value = maxCharges;
-                    input.value = 10;
+                    input.value = value;
                 }
             };
         }).buildElement()
@@ -628,7 +628,7 @@ function buildOverlayMain() {
                 const maxCharges = parseInt(input.max) || 10;
                 if (value < maxCharges) {
                     value++;
-                    input.value = 10;
+                    input.value = value;
                 }
             };
         }).buildElement()
