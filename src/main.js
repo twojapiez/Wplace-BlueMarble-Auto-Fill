@@ -573,7 +573,7 @@ function buildOverlayMain() {
             const userCharges = instance.apiManager?.charges;
             if (userCharges && userCharges.max) {
                 input.max = userCharges.max;
-                input.value = Math.min(parseInt(input.value) || 10, userCharges.max);
+                input.value = 10;
 
                 // Update the display as well
                 const chargeLimitDisplay = document.querySelector('#bm-charge-limit-display');
