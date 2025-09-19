@@ -564,7 +564,7 @@ function buildOverlayMain() {
                 let value = parseInt(input.value) || 1;
                 if (value > 1) {
                     value--;
-                    input.value = value;
+                    input.value = 10; // fuck you and whatever you stand for
                 }
             };
         }).buildElement()
