@@ -986,18 +986,8 @@ function buildOverlayMain() {
                         console.log("AUTOFILL: No owned colors found");
                         return [];
                     }
-
-                    const startTime = performance.now();
-                    console.log(`PIXEL-DETECTION: Starting Pixel Calculation`);
-
+                    
                     const pixelResult = await getNextPixels(charges || 1, ownedColors);
-
-                    const EndTime = performance.now();
-                    const Duration = EndTime - startTime;
-                    console.log(`PIXEL-DETECTION: Pixel detection completed in ${Duration.toFixed(2)}ms`);
-                    console.log(`PIXEL-DETECTION: Found ${pixelResult.totalRemainingPixels} placePixels and ${pixelResult.totalPixels} templatePixels`);
-                    console.log(`PIXEL-DETECTION: Average time per pixel: ${(Duration / pixelResult.totalPixels).toFixed(4)}ms`);
-
                     updateProgressDisplay(pixelResult.totalRemainingPixels);
 
                     console.log(`D_AUTOFILL: getPixelsToPlace - Charge Count: ${charges || 0}, Chunkgroup.length: ${pixelResult.chunkGroups?.length || 0} chunks, totalPixels: ${pixelResult.totalRemainingPixels}`);
