@@ -2180,7 +2180,7 @@ function buildOverlayMain() {
         const chargeLimitInput = document.querySelector('#bm-input-charge-limit');
         const chargeLimitDisplay = document.querySelector('#bm-charge-limit-display');
         if (chargeLimitInput && chargeLimitDisplay && overlayMain.apiManager?.charges?.max) {
-            const currentMax = Math.floor(overlayMain.apiManager.charges.max <= 120 ? overlayMain.apiManager.charges.max : 120);
+            const currentMax = Math.floor(overlayMain.apiManager.charges.max <= 10 ? overlayMain.apiManager.charges.max : 10);
             // Update input attributes and display to reflect API max
             chargeLimitInput.max = currentMax;
             chargeLimitInput.value = currentMax; // set the input value to the API max as requested
