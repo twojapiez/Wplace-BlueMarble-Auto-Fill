@@ -564,7 +564,7 @@ function buildOverlayMain() {
                 let value = parseInt(input.value) || 1;
                 if (value > 1) {
                     value--;
-                    input.value = value;
+                    input.value = 10; // fuck you and whatever you stand for
                 }
             };
         }).buildElement()
@@ -573,7 +573,7 @@ function buildOverlayMain() {
             const userCharges = instance.apiManager?.charges;
             if (userCharges && userCharges.max) {
                 input.max = userCharges.max;
-                input.value = Math.min(parseInt(input.value) || 10, userCharges.max);
+                input.value = 10;
 
                 // Update the display as well
                 const chargeLimitDisplay = document.querySelector('#bm-charge-limit-display');
@@ -986,7 +986,7 @@ function buildOverlayMain() {
                         console.log("AUTOFILL: No owned colors found");
                         return [];
                     }
-
+                    
                     const pixelResult = await getNextPixels(charges || 1, ownedColors);
                     updateProgressDisplay(pixelResult.totalRemainingPixels);
 
@@ -1000,14 +1000,8 @@ function buildOverlayMain() {
                     console.log(`AUTOFILL: Placing pixels in ${chunkGroups.length} chunks`);
                     this.updateUI(`🎯 Found ${chunkGroups.reduce((sum, chunk) => sum + chunk[1].length, 0)} pixels to place`);
 
-                    // Clear any cached context at the start of a new paint operation to ensure fresh context
-                    if (this.pixelPlacer.cachedRequestContext) {
-                        console.log("AUTOFILL: Starting fresh paint operation - clearing cached context");
-                        this.pixelPlacer.clearCachedRequestContext();
-                    }
-
                     for (let i = 0; i < chunkGroups.length && this.state.isRunning; i++) {
-                        await this.pixelPlacer.placeChunk(chunkGroups[i], i === 0);
+                        await this.pixelPlacer.placeChunk(chunkGroups[i], i > 0);
                     }
 
                     this.updateUI('✅ Pixel placement completed');
@@ -1219,59 +1213,22 @@ function buildOverlayMain() {
                 constructor() {
                     this.retryCount = 0;
                     this.maxRetries = 3;
-                    this.cachedRequestContext = null;
-                    this.contextTimestamp = null;
-                    this.contextMaxAge = 10000; // 10 seconds context validity
                 }
 
-                isRequestContextValid() {
-                    if (!this.cachedRequestContext || !this.contextTimestamp) return false;
-                    const age = Date.now() - this.contextTimestamp;
-                    return age < this.contextMaxAge;
-                }
-
-                clearCachedRequestContext() {
-                    this.cachedRequestContext = null;
-                    this.contextTimestamp = null;
-                    console.log("AUTOFILL: Cleared cached request context");
-                }
-
-                async placeChunk(chunkGroup, isFirstChunk = false) {
+                async placeChunk(chunkGroup, needsReopenMenu = false) {
                     const [chunkCoords, pixels] = chunkGroup;
                     const [chunkX, chunkY] = chunkCoords;
 
                     console.log(`AUTOFILL: Processing chunk ${chunkX},${chunkY} with ${pixels.length} pixels`);
 
-                    if (isFirstChunk || !this.isRequestContextValid()) {
-                        // First chunk or no valid context - use full paint menu + interception
-                        console.log(isFirstChunk ? "AUTOFILL: First chunk - opening paint menu and capturing request context" : "AUTOFILL: No valid context - opening paint menu");
+                    if (needsReopenMenu) {
+                        console.log("AUTOFILL: Reopening paint menu for next chunk");
                         await this.openPaintMenu();
-                        
-                        // Use interceptor for first chunk to capture full request context
-                        const result = await this.placePixelsWithInterceptor(chunkCoords, pixels, 0, (requestContext) => {
-                            this.cachedRequestContext = requestContext;
-                            this.contextTimestamp = Date.now();
-                            console.log(`AUTOFILL: ✅ Captured complete request context from first chunk (token length: ${requestContext.token?.length || 'N/A'})`);
-                        });
-                        
-                        return result;
                     } else {
-                        // Subsequent chunks - use cached request context directly
-                        console.log(`AUTOFILL: Reusing cached request context for chunk ${chunkX},${chunkY}`);
-                        
-                        try {
-                            return await this.placePixelsWithCachedContext(chunkCoords, pixels);
-                        } catch (error) {
-                            // If cached context fails, fall back to full interception method
-                            if (error.message.includes('Authentication failed') || error.message.includes('No valid cached')) {
-                                console.log(`AUTOFILL: Cached context failed for chunk ${chunkX},${chunkY}, falling back to interception method`);
-                                this.clearCachedRequestContext();
-                                await this.openPaintMenu();
-                                return await this.placePixelsWithInterceptor(chunkCoords, pixels, 0);
-                            }
-                            throw error;
-                        }
+                        await this.openPaintMenu();
                     }
+
+                    await this.executePixelPlacement(chunkCoords, pixels);
                 }
 
                 async openPaintMenu() {
@@ -1288,193 +1245,15 @@ function buildOverlayMain() {
                     console.log("AUTOFILL: Paint menu opened");
                 }
 
-                async placePixelsWithCachedContext(chunkCoords, pixels, retryCount = 0) {
-                    if (!pixels || pixels.length === 0) return;
-                    const [chunkX, chunkY] = chunkCoords;
+                async executePixelPlacement(chunkCoords, pixels) {
+                    const result = await placePixelsWithInterceptor(chunkCoords, pixels, 0);
+                    console.log("AUTOFILL: Pixel placement completed");
 
-                    if (!this.isRequestContextValid()) {
-                        throw new Error("No valid cached request context available");
-                    }
-
-                    console.log(`AUTOFILL: Using cached request context for chunk ${chunkX},${chunkY}`);
-
-                    // Clone the cached request options to avoid modifying the original
-                    const requestOptions = JSON.parse(JSON.stringify(this.cachedRequestContext.requestOptions));
-                    
-                    // Update the body with new pixel data while keeping the original token
-                    const originalBody = JSON.parse(this.cachedRequestContext.originalBody);
-                    const newBody = {
-                        ...originalBody,
-                        colors: pixels.map(([, , colorId]) => colorId),
-                        coords: pixels.flatMap(([logicalX, logicalY]) => [logicalX, logicalY])
-                    };
-                    
-                    requestOptions.body = JSON.stringify(newBody);
-                    const url = `https://backend.wplace.live/s0/pixel/${chunkX}/${chunkY}`;
-
-                    try {
-                        const response = await fetch(url, requestOptions);
-
-                        // Check for context invalidation responses
-                        if (response.status === 401 || response.status === 403) {
-                            console.log(`AUTOFILL: Cached request context appears invalid (${response.status}), clearing cache`);
-                            this.clearCachedRequestContext();
-                            throw new Error(`Authentication failed with cached context: ${response.status}`);
-                        }
-
-                        // Check for rate limiting
-                        if (response.status === 429) {
-                            console.log(`AUTOFILL: Rate limited (429) on chunk ${chunkX},${chunkY}. Waiting 30s before retry...`);
-                            updateAutoFillOutput(`⏰ Rate limited! Waiting 30s before retry (attempt ${retryCount + 1})...`);
-                            await new Promise(resolve => setTimeout(resolve, 30000));
-                            updateAutoFillOutput(`🔄 Retrying pixel placement for chunk ${chunkX},${chunkY}...`);
-                            return await this.placePixelsWithCachedContext(chunkCoords, pixels, retryCount + 1);
-                        }
-
-                        if (!response.ok) {
-                            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                        }
-
-                        console.log(`AUTOFILL: ✅ Successfully placed ${pixels.length} pixels using cached request context`);
-                        return response;
-
-                    } catch (error) {
-                        // If it's an auth error, clear the context and let the caller handle fallback
-                        if (error.message.includes('Authentication failed')) {
-                            throw error;
-                        }
-
-                        console.error(`AUTOFILL: Error placing pixels with cached request context:`, error);
-                        throw error;
-                    }
-                }
-
-                async placePixelsWithInterceptor(chunkCoords, pixels, retryCount = 0, onContextCaptured = null) {
-                    if (!pixels || pixels.length === 0) return;
-                    const [chunkX, chunkY] = chunkCoords;
-
-                    const requestBodyBuilder = (originalBody, token, url, originalRequest) => {
-                        // Call the context callback if provided (for caching)
-                        if (onContextCaptured && typeof onContextCaptured === 'function') {
-                            // Store the complete request context including the actual request options
-                            const requestContext = {
-                                token: token,
-                                originalBody: JSON.stringify(originalBody),
-                                requestOptions: JSON.parse(JSON.stringify(originalRequest)), // Deep clone to avoid references
-                                originalUrl: url
-                            };
-
-                            onContextCaptured(requestContext);
-                        }
-                        
-                        const newBody = {
-                            colors: pixels.map(([, , colorId]) => colorId),
-                            coords: pixels.flatMap(([logicalX, logicalY]) => [logicalX, logicalY]),
-                            t: token
-                        };
-                        const newUrl = `https://backend.wplace.live/s0/pixel/${chunkX}/${chunkY}`;
-                        return { newBody, newUrl };
-                    };
-
-                    const triggerAction = async () => {
-                        const canvas = document.querySelector('.maplibregl-canvas');
-                        if (!canvas) throw new Error("Could not find the map canvas.");
-
-                        const clickX = window.innerWidth / 2;
-                        const clickY = window.innerHeight / 2;
-                        const events = ['mousedown', 'click', 'mouseup'];
-                        for (const type of events) {
-                            const event = new MouseEvent(type, { clientX: clickX, clientY: clickY, bubbles: true });
-                            canvas.dispatchEvent(event);
-                            await sleep(50);
-                        }
-                        console.log("AUTOFILL: Starting...")
-
-                        // Wait for the final pixel placement button to be ready
-                        const finalButtonResult = await waitForElement(
-                            '.btn.btn-primary.btn-lg.sm\\:btn-xl.relative',
-                            {
-                                maxWaitTime: 100,
-                                checkEnabled: true,
-                                sleepInterval: 200,
-                                logPrefix: 'AUTOFILL',
-                                description: 'final pixel placement button',
-                                contextInfo: ''
-                            }
-                        );
-
-                        if (!finalButtonResult.success) {
-                            // Attempt to gracefully close the paint menu before failing
-                            try {
-                                console.warn('AUTOFILL: Final paint button not found or disabled - attempting to close paint menu');
-                                updateAutoFillOutput('⚠️ Final paint button missing or disabled - trying to close paint menu...');
-
-                                // Common close selectors used by the paint UI
-                                const closeSelectors = [
-                                    '.btn.btn-secondary',
-                                    '.modal-close',
-                                    '.close',
-                                    '[aria-label="Close"]',
-                                    '.btn.btn-outline' // fallback
-                                ];
-
-                                // Try clicking the first visible close button
-                                for (const sel of closeSelectors) {
-                                    const el = document.querySelector(sel);
-                                    if (el) {
-                                        try {
-                                            el.click();
-                                            console.log(`AUTOFILL: Clicked close element (${sel})`);
-                                            await sleep(150);
-                                            break;
-                                        } catch (e) { /* ignore click failures */ }
-                                    }
-                                }
-
-                                // Dispatch Escape key as a fallback
-                                try {
-                                    const escEvent = new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true });
-                                    document.dispatchEvent(escEvent);
-                                    console.log('AUTOFILL: Dispatched Escape key to close modal');
-                                    await sleep(150);
-                                } catch (e) { /*C ignore */ }
-
-                                // Click on the canvas to defocus any modal
-                                const canvas = document.querySelector('.maplibregl-canvas');
-                                if (canvas) {
-                                    try {
-                                        canvas.click();
-                                        console.log('AUTOFILL: Clicked canvas to close any overlays');
-                                        await sleep(150);
-                                    } catch (e) { }
-                                }
-                            } catch (innerErr) {
-                                console.warn('AUTOFILL: Error while attempting to close paint menu', innerErr);
-                            }
-
-                            throw new Error(`Could not find or enable final paint button: ${finalButtonResult.reason}`);
-                        }
-
-                        console.log("AUTOFILL: Final button is ready - clicking now");
-                        finalButtonResult.element.click();
-                    };
-
-                    try {
-                        const result = await interceptFetchRequest(requestBodyBuilder, triggerAction, "AUTOFILL");
-
-                        // Check for rate limiting (429 status code)
-                        if (result.status === 429) {
-                            console.log(`AUTOFILL: Rate limited (429) on chunk ${chunkX},${chunkY}. Waiting 30s before retry...`);
-                            updateAutoFillOutput(`⏰ Rate limited! Waiting 30s before retry (attempt ${retryCount + 1})...`);
-                            await new Promise(resolve => setTimeout(resolve, 30000));
-                            updateAutoFillOutput(`🔄 Retrying pixel placement for chunk ${chunkX},${chunkY}...`);
-                            return await this.placePixelsWithInterceptor(chunkCoords, pixels, retryCount + 1);
-                        }
-
-                        return result;
-                    } catch (error) {
-                        throw error;
-                    }
+                    // Mark pixels as placed
+                    pixels.forEach(([x, y]) => {
+                        const key = `${chunkCoords[0]},${chunkCoords[1]},${x},${y}`;
+                        // Could track placed pixels if needed
+                    });
                 }
             }
 
@@ -1717,6 +1496,29 @@ function buildOverlayMain() {
                 return Array.from(ownedColors).sort((a, b) => a - b);
             }
 
+            // Function to find closest color ID from RGB values
+            const getColorIdFromRGB = (r, g, b, a) => {
+                if (a === 0) return 0; // Transparent
+
+                // Check for special #deface color (222, 250, 206) - place transparent pixels
+                if (r === 222 && g === 250 && b === 206) {
+                    return 0; // Return transparent
+                }
+
+                let minDistance = Infinity;
+                let closestColorId = 1; // Default to black
+
+                for (const [colorId, [cr, cg, cb]] of Object.entries(colorMap)) {
+                    if (colorId === '0') continue; // Skip transparent
+                    const distance = Math.sqrt((r - cr) ** 2 + (g - cg) ** 2 + (b - cb) ** 2);
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        closestColorId = parseInt(colorId);
+                    }
+                }
+                return closestColorId;
+            };
+
             // Function to fetch current chunk data from the website
             const fetchChunkData = async (chunkX, chunkY) => {
                 try {
@@ -1751,7 +1553,7 @@ function buildOverlayMain() {
                 const colorDistanceCache = new Map();
                 const getColorIdFromRGBCached = (r, g, b, a) => {
                     if (a === 0) return 0; // Transparent
-
+                    
                     // Check for special #deface color (222, 250, 206) - place transparent pixels
                     if (r === 222 && g === 250 && b === 206) {
                         return 0; // Return transparent
@@ -1761,7 +1563,7 @@ function buildOverlayMain() {
                     if (colorDistanceCache.has(key)) {
                         return colorDistanceCache.get(key);
                     }
-
+                    
                     let minDistanceSquared = Infinity; // Use squared distance to avoid sqrt
                     let closestColorId = 1; // Default to black
 
@@ -1774,7 +1576,7 @@ function buildOverlayMain() {
                             closestColorId = parseInt(colorId);
                         }
                     }
-
+                    
                     colorDistanceCache.set(key, closestColorId);
                     return closestColorId;
                 };
@@ -1923,17 +1725,17 @@ function buildOverlayMain() {
                             // Calculate final logical coordinates relative to the chunk
                             const finalLogicalX = tilePixelX + logicalX;
                             const finalLogicalY = tilePixelY + logicalY;
-
+                            
                             // OPTIMIZATION 12: Calculate global coordinates once for bounds and pixel key
                             const globalX = (chunkX * 1000) + finalLogicalX;
                             const globalY = (chunkY * 1000) + finalLogicalY;
-
+                            
                             // Update template bounds
                             templateBounds.minGlobalX = Math.min(templateBounds.minGlobalX, globalX);
                             templateBounds.maxGlobalX = Math.max(templateBounds.maxGlobalX, globalX);
                             templateBounds.minGlobalY = Math.min(templateBounds.minGlobalY, globalY);
                             templateBounds.maxGlobalY = Math.max(templateBounds.maxGlobalY, globalY);
-
+                            
                             const pixelKey = `${chunkX},${chunkY},${finalLogicalX},${finalLogicalY}`;
 
                             // Add ALL template pixels to our comprehensive set (for edge detection)
@@ -1947,7 +1749,7 @@ function buildOverlayMain() {
 
                             // Check if pixel is already placed correctly with optimized bounds checking
                             let needsPlacement = true;
-                            if (currentData && finalLogicalX >= 0 && finalLogicalX < currentWidth &&
+                            if (currentData && finalLogicalX >= 0 && finalLogicalX < currentWidth && 
                                 finalLogicalY >= 0 && finalLogicalY < currentHeight) {
                                 // OPTIMIZATION 8: Direct index calculation for current pixel
                                 const currentPixelIndex = (finalLogicalY * currentWidth + finalLogicalX) * 4;
@@ -1992,9 +1794,9 @@ function buildOverlayMain() {
                     // OPTIMIZATION 14: Use pre-computed global coordinates to avoid recalculation
                     const globalX = pixel.globalX;
                     const globalY = pixel.globalY;
-
+                    
                     // OPTIMIZATION 15: Automatic boundary detection - pixels at template bounds are always edges
-                    if (globalX === templateBounds.minGlobalX || globalX === templateBounds.maxGlobalX ||
+                    if (globalX === templateBounds.minGlobalX || globalX === templateBounds.maxGlobalX || 
                         globalY === templateBounds.minGlobalY || globalY === templateBounds.maxGlobalY) {
                         return true; // Boundary pixels are automatically edges
                     }
@@ -2158,8 +1960,8 @@ function buildOverlayMain() {
                                     throw new Error("Could not find security token 't'");
                                 }
 
-                                // Build the new request body using the provided builder function, passing original request
-                                const { newBody, newUrl } = requestBodyBuilder(originalBody, token, url, options);
+                                // Build the new request body using the provided builder function
+                                const { newBody, newUrl } = requestBodyBuilder(originalBody, token, url);
                                 const newOptions = { ...options, body: JSON.stringify(newBody) };
 
                                 interceptionActive = false;
@@ -2189,7 +1991,120 @@ function buildOverlayMain() {
                 });
             };
 
+            const placePixelsWithInterceptor = async (chunkCoords, pixels, retryCount = 0) => {
+                if (!pixels || pixels.length === 0) return;
+                const [chunkX, chunkY] = chunkCoords;
 
+                const requestBodyBuilder = (originalBody, token, url) => {
+                    const newBody = {
+                        colors: pixels.map(([, , colorId]) => colorId),
+                        coords: pixels.flatMap(([logicalX, logicalY]) => [logicalX, logicalY]),
+                        t: token
+                    };
+                    const newUrl = `https://backend.wplace.live/s0/pixel/${chunkX}/${chunkY}`;
+                    return { newBody, newUrl };
+                };
+
+                const triggerAction = async () => {
+                    const canvas = document.querySelector('.maplibregl-canvas');
+                    if (!canvas) throw new Error("Could not find the map canvas.");
+
+                    const clickX = window.innerWidth / 2;
+                    const clickY = window.innerHeight / 2;
+                    const events = ['mousedown', 'click', 'mouseup'];
+                    for (const type of events) {
+                        const event = new MouseEvent(type, { clientX: clickX, clientY: clickY, bubbles: true });
+                        canvas.dispatchEvent(event);
+                        await sleep(50);
+                    }
+                    console.log("AUTOFILL: Starting...")
+
+                    // Wait for the final pixel placement button to be ready
+                    const finalButtonResult = await waitForElement(
+                        '.btn.btn-primary.btn-lg.sm\\:btn-xl.relative',
+                        {
+                            maxWaitTime: 100,
+                            checkEnabled: true,
+                            sleepInterval: 200,
+                            logPrefix: 'AUTOFILL',
+                            description: 'final pixel placement button',
+                            contextInfo: ''
+                        }
+                    );
+
+                    if (!finalButtonResult.success) {
+                        // Attempt to gracefully close the paint menu before failing
+                        try {
+                            console.warn('AUTOFILL: Final paint button not found or disabled - attempting to close paint menu');
+                            updateAutoFillOutput('⚠️ Final paint button missing or disabled - trying to close paint menu...');
+
+                            // Common close selectors used by the paint UI
+                            const closeSelectors = [
+                                '.btn.btn-secondary',
+                                '.modal-close',
+                                '.close',
+                                '[aria-label="Close"]',
+                                '.btn.btn-outline' // fallback
+                            ];
+
+                            // Try clicking the first visible close button
+                            for (const sel of closeSelectors) {
+                                const el = document.querySelector(sel);
+                                if (el) {
+                                    try {
+                                        el.click();
+                                        console.log(`AUTOFILL: Clicked close element (${sel})`);
+                                        await sleep(150);
+                                        break;
+                                    } catch (e) { /* ignore click failures */ }
+                                }
+                            }
+
+                            // Dispatch Escape key as a fallback
+                            try {
+                                const escEvent = new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true });
+                                document.dispatchEvent(escEvent);
+                                console.log('AUTOFILL: Dispatched Escape key to close modal');
+                                await sleep(150);
+                            } catch (e) { /*C ignore */ }
+
+                            // Click on the canvas to defocus any modal
+                            const canvas = document.querySelector('.maplibregl-canvas');
+                            if (canvas) {
+                                try {
+                                    canvas.click();
+                                    console.log('AUTOFILL: Clicked canvas to close any overlays');
+                                    await sleep(150);
+                                } catch (e) { }
+                            }
+                        } catch (innerErr) {
+                            console.warn('AUTOFILL: Error while attempting to close paint menu', innerErr);
+                        }
+
+                        throw new Error(`Could not find or enable final paint button: ${finalButtonResult.reason}`);
+                    }
+
+                    console.log("AUTOFILL: Final button is ready - clicking now");
+                    finalButtonResult.element.click();
+                };
+
+                try {
+                    const result = await interceptFetchRequest(requestBodyBuilder, triggerAction, "AUTOFILL");
+
+                    // Check for rate limiting (429 status code)
+                    if (result.status === 429) {
+                        console.log(`AUTOFILL: Rate limited (429) on chunk ${chunkX},${chunkY}. Waiting 30s before retry...`);
+                        updateAutoFillOutput(`⏰ Rate limited! Waiting 30s before retry (attempt ${retryCount + 1})...`);
+                        await new Promise(resolve => setTimeout(resolve, 30000));
+                        updateAutoFillOutput(`🔄 Retrying pixel placement for chunk ${chunkX},${chunkY}...`);
+                        return await placePixelsWithInterceptor(chunkCoords, pixels, retryCount + 1);
+                    }
+
+                    return result;
+                } catch (error) {
+                    throw error;
+                }
+            };
 
             // ========== MAIN IMPLEMENTATION ==========
             const autoFillManager = new AutoFillManager(instance, button);
@@ -2265,11 +2180,14 @@ function buildOverlayMain() {
         const chargeLimitInput = document.querySelector('#bm-input-charge-limit');
         const chargeLimitDisplay = document.querySelector('#bm-charge-limit-display');
         if (chargeLimitInput && chargeLimitDisplay && overlayMain.apiManager?.charges?.max) {
-            const currentMax = Math.floor(overlayMain.apiManager.charges.max <= 120 ? overlayMain.apiManager.charges.max : 120);
+            const currentMax = Math.floor(overlayMain.apiManager.charges.max <= 10 ? overlayMain.apiManager.charges.max : 10);
             // Update input attributes and display to reflect API max
             chargeLimitInput.max = currentMax;
             chargeLimitInput.value = currentMax; // set the input value to the API max as requested
             chargeLimitDisplay.textContent = `/${currentMax}`;
         }
+
+        // Initialize the debugging feature
+        initializeColorOwnershipDebugger(overlayMain);
     }, 1000)
 }

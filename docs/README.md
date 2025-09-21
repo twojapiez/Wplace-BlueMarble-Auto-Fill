@@ -59,7 +59,7 @@
 <p>
   Lazy, Vibecoded fork of BlueMarbel.
   
-  Usage: add a blueprint and hit the autofill button to start autoplacing pixels. If your paint charges are full or enough to finish the template, it will open your paint menu, read the colors you own, and place the pixels it can place in Scanline or Random depending on the mode you selected, the outline gets place first. It places them by clicking the centre of the canvas, hitting the finish button in the paint menu and intercepting the request to add the pixels we want to paint. Then it clicks it again and closes the paint menu to update our ui and shit.
+  Usage: add a blueprint and hit the autofill button to start autoplacing pixels. If your paint charges are full or enough to finis hthe template, it will open your paint menu, read the colors you own, and place the pixels it can place in Scanline or Random depending on the mode you selected, the outline gets place first. It places them by clicking the centre of the canvas, hitting the finish button in the paint menu and intercepting the request to add the pixels we want to paint. Then it clicks it again and closes the paint menu to update our ui and shit.
 
   This was coded in a few days, is implemented very lazily and barely works so dont expect too much of it.
 <h2>Overview</h2>
